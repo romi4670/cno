@@ -1,0 +1,639 @@
+<!--
+  CNO — Chief Naming Officer (CPU 상품명 검증기)
+  Romi Lab · author: Rom Kim (romi4670)
+  - 입력: 제조사 / 브랜드 / 상품명 / 부가제목 / 키워드 (복붙, 1건 단위)
+  - 규격: 상품명 = 모델명 (정식 코드네임)  / 괄호 앞 1칸
+  - Truth Protocol: 코드네임은 규칙기반 추론. 추론 불가 시 '확인불가→수동검증'으로 플래그(허위판정 금지)
+  - 방법론 공개 가능, 회사 데이터 미포함
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNO — 상품명 검증기 (CPU · 모니터) · Romi Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EAEEF1; --panel:#FFFFFF; --ink:#16202A; --ink-soft:#4A5A68;
+    --indigo:#24417A; --indigo-deep:#172A52; --hair:#D2DAE1;
+    --err:#B23A2E; --err-bg:#FBECEA;
+    --warn:#9A6B12; --warn-bg:#FBF3E2;
+    --ok:#2F6B4F; --ok-bg:#E9F3EE;
+    --unk:#5B6772; --unk-bg:#EEF1F3;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans KR',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+
+  header{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--indigo);font-weight:600}
+  h1{font-size:26px;font-weight:700;margin:4px 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--ink-soft);font-size:13px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:4px}
+  .card-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);padding:12px 16px;border-bottom:1px solid var(--hair);font-weight:600}
+  .card-b{padding:16px}
+
+  label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 0 4px}
+  .field{margin-bottom:12px}
+  input,textarea{width:100%;font-family:var(--mono);font-size:14px;color:var(--ink);
+    border:1px solid var(--hair);border-radius:3px;padding:9px 10px;background:#FCFDFE;resize:vertical}
+  input:focus,textarea:focus{outline:2px solid var(--indigo);outline-offset:-1px;border-color:var(--indigo)}
+  textarea{min-height:54px;line-height:1.5}
+
+  .btn{font-family:var(--sans);font-weight:600;font-size:14px;border:none;border-radius:3px;
+    padding:11px 18px;cursor:pointer}
+  .btn-run{background:var(--indigo);color:#fff;width:100%}
+  .btn-run:hover{background:var(--indigo-deep)}
+  .btn-ghost{background:transparent;border:1px solid var(--hair);color:var(--ink-soft);
+    padding:6px 11px;font-size:12px;font-weight:500}
+  .btn-ghost:hover{border-color:var(--indigo);color:var(--indigo)}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
+
+  /* results */
+  #out{margin-top:22px}
+  .hidden{display:none}
+  .std{background:var(--indigo-deep);color:#fff;border-radius:4px;padding:16px 18px;margin-bottom:18px}
+  .std .lab{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    color:#9FB2D6;margin-bottom:6px}
+  .std .val{font-family:var(--mono);font-size:18px;font-weight:600;word-break:break-all}
+  .std .copy{margin-top:10px}
+  .std .copy button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);
+    color:#fff;font-size:12px;padding:5px 12px;border-radius:3px;cursor:pointer;font-family:var(--sans)}
+  .std .copy button:hover{background:rgba(255,255,255,.22)}
+
+  .checks{background:var(--panel);border:1px solid var(--hair);border-radius:4px;overflow:hidden}
+  .chk{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--hair);align-items:flex-start}
+  .chk:last-child{border-bottom:none}
+  .badge{flex:0 0 auto;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.06em;
+    padding:3px 8px;border-radius:3px;text-transform:uppercase;margin-top:1px;min-width:62px;text-align:center}
+  .b-err{background:var(--err-bg);color:var(--err)}
+  .b-warn{background:var(--warn-bg);color:var(--warn)}
+  .b-ok{background:var(--ok-bg);color:var(--ok)}
+  .b-unk{background:var(--unk-bg);color:var(--unk)}
+  .chk .body{flex:1}
+  .chk .t{font-weight:600;font-size:14px}
+  .chk .d{font-size:13px;color:var(--ink-soft);margin-top:2px}
+  .chk .d code{font-family:var(--mono);background:var(--paper);padding:1px 5px;border-radius:3px;font-size:12px}
+
+  .movelist{background:var(--panel);border:1px solid var(--hair);border-radius:4px;margin-top:18px}
+  .movelist .card-h{border-bottom:1px solid var(--hair)}
+  .move{display:flex;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--hair);font-size:13px}
+  .move:last-child{border-bottom:none}
+  .chip{font-family:var(--mono);font-size:12px;background:var(--paper);border:1px solid var(--hair);
+    padding:3px 8px;border-radius:3px;font-weight:500}
+  .arrow{color:var(--ink-soft)}
+  .dest{font-weight:600;color:var(--indigo)}
+
+  .note{font-size:12px;color:var(--ink-soft);margin-top:18px;padding:12px 14px;border:1px dashed var(--hair);
+    border-radius:4px;background:#F7F9FA;line-height:1.6}
+  .note b{color:var(--ink)}
+
+  .summary{background:var(--panel);border:1px solid var(--hair);border-radius:4px;margin-top:18px;position:relative}
+  .sum-body{padding:6px 0}
+  .sum-row{display:flex;gap:0;border-bottom:1px solid #EEF1F3;font-size:13px}
+  .sum-row:last-child{border-bottom:none}
+  .sum-l{flex:0 0 168px;padding:8px 14px;color:var(--ink-soft);font-weight:600;background:#F7F9FA;
+    border-right:1px solid var(--hair)}
+  .sum-v{flex:1;padding:8px 14px;font-family:var(--mono);color:var(--ink);word-break:break-all}
+  .sum-empty .sum-v{color:var(--err);font-style:italic}
+  .sum-empty .sum-l{color:var(--err)}
+  .sum-foot{padding:12px 14px;border-top:1px solid var(--hair)}
+  .sum-foot button{background:var(--indigo);color:#fff;border:none;font-size:12px;padding:7px 14px;
+    border-radius:3px;cursor:pointer;font-family:var(--sans);font-weight:600}
+  .sum-foot button:hover{background:var(--indigo-deep)}
+  @media(max-width:520px){.sum-l{flex:0 0 110px}}
+  @media(prefers-reduced-motion:no-preference){
+    .std,.checks,.movelist{animation:rise .28s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  }
+  /* 카테고리 토글 */
+  .cattog{display:flex;gap:0;margin-bottom:16px;border:1px solid var(--hair);border-radius:4px;overflow:hidden;width:fit-content}
+  .cattog button{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;
+    padding:8px 20px;border:none;background:var(--panel);color:var(--ink-soft);cursor:pointer;text-transform:uppercase}
+  .cattog button+button{border-left:1px solid var(--hair)}
+  .cattog button.on{background:var(--indigo);color:#fff}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">CNO · Chief Naming Officer &nbsp;|&nbsp; Romi Lab</div>
+    <h1>CNO — 상품명 검증기</h1>
+    <div class="sub" id="subline">CPU · 모니터 카테고리 &nbsp;|&nbsp; 규격 검사 · 필드 분리 제안 &nbsp;|&nbsp; 회사 데이터 미포함 · 1건 단위</div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-h">입력 · 신관리자 필드 그대로 붙여넣기</div>
+      <div class="card-b">
+        <div class="cattog">
+          <button id="cat-cpu" class="on" onclick="setCat('cpu')">CPU</button>
+          <button id="cat-mon" onclick="setCat('monitor')">모니터</button>
+        </div>
+        <div class="field"><label id="lb-maker">제조사</label><input id="maker" placeholder="예: 인텔"></div>
+        <div class="field"><label id="lb-brand">브랜드</label><input id="brand" placeholder="예: 코어i5-6세대"></div>
+        <div class="field"><label>상품명</label><input id="name" placeholder="예: 6600 (스카이레이크) (벌크) (중고)"></div>
+        <div class="field"><label>부가제목</label><textarea id="sub"></textarea></div>
+        <div class="field"><label>키워드</label><textarea id="kw"></textarea></div>
+        <div class="field" id="spec-field"><label>중요요약설명 스펙 · EPYC 서버 (파이프 <span style="font-family:var(--mono)">|</span> 구분, 선택)</label><textarea id="spec" placeholder="예: AMD(소켓SP5/...)|EPYC 9004 시리즈(Zen4/Genoa)|5nm|16코어|..."></textarea></div>
+        <button class="btn btn-run" onclick="run()">검증하기</button>
+        <div class="presets" id="presets-cpu">
+          <button class="btn btn-ghost" onclick="fill('i5-6600')">i5-6600</button>
+          <button class="btn btn-ghost" onclick="fill('i9-9900KF')">i9-9900KF</button>
+          <button class="btn btn-ghost" onclick="fill('9800X3D')">9800X3D</button>
+          <button class="btn btn-ghost" onclick="fill('EPYC9535')">EPYC 9535</button>
+          <button class="btn btn-ghost" onclick="fill('G4400')">G4400</button>
+          <button class="btn btn-ghost" onclick="fill('Xeon8460')">Xeon 8460Y+</button>
+          <button class="btn btn-ghost" onclick="fill('Xeon6767P')">Xeon 6767P</button>
+        </div>
+        <div class="presets hidden" id="presets-mon">
+          <button class="btn btn-ghost" onclick="fill('B225H')">B225H (기준)</button>
+          <button class="btn btn-ghost" onclick="fill('B225H_raw')">B225H (정리 전)</button>
+          <button class="btn btn-ghost" onclick="fill('MON_game')">게이밍 예시</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="spec-cpu">
+      <div class="card-h">규격 정의 · CPU (확정)</div>
+      <div class="card-b" style="font-size:13.5px;color:var(--ink-soft);line-height:1.7">
+        <p style="margin:0 0 10px"><b style="color:var(--ink)">상품명</b> = <code style="font-family:var(--mono)">모델명 (코드네임)</code><br>제조사·브랜드가 별도 필드에 세팅되므로 상품명은 모델명부터 시작.</p>
+        <p style="margin:0 0 10px"><b style="color:var(--ink)">코드네임</b>은 정식 명칭, 괄호 1개, 괄호 앞 띄어쓰기 1칸.<br>예: <code style="font-family:var(--mono)">커피레이크 리프레시</code> (✗ 커피레이크-R)</p>
+        <p style="margin:0 0 10px"><b style="color:var(--ink)">상품명 금지</b>: 유통구분·상태·쿨러·A/S·스펙·홍보문구 → 각 필드로 분리.</p>
+        <p style="margin:0"><b style="color:var(--ink)">사실검증</b>: 모델↔코드네임 정합성을 규칙 기반으로 확인. 추론 불가 모델은 허위판정 대신 <b style="color:var(--unk)">확인불가</b>로 표시.</p>
+      </div>
+    </div>
+    <div class="card hidden" id="spec-mon">
+      <div class="card-h">규격 정의 · 모니터 (사무/일반 라인)</div>
+      <div class="card-b" style="font-size:13.5px;color:var(--ink-soft);line-height:1.7">
+        <p style="margin:0 0 10px"><b style="color:var(--ink)">상품명</b> = <code style="font-family:var(--mono)">모델명 크기 해상도 싱크 HDR [무결점]</code><br>예: <code style="font-family:var(--mono)">B225H 21.5 FHD 프리싱크 HDR [무결점]</code></p>
+        <p style="margin:0 0 10px"><b style="color:var(--ink)">표기 규칙</b>: 크기=숫자만(<code>21.5</code>) · 해상도=약어(<code>FHD/QHD/UHD</code>) · 싱크=한글(<code>프리싱크</code>) · HDR 유지.</p>
+        <p style="margin:0 0 10px"><b style="color:var(--ink)">노출 순서</b>: 크기 &gt; 해상도 &gt; 싱크·HDR. <b>저주사율(≤75Hz)은 상품명에서 생략</b>(검색 기여 낮음). 게이밍(≥100Hz)은 주사율을 크기 뒤로 노출.</p>
+        <p style="margin:0 0 10px"><b style="color:var(--ink)">브랜드</b>(비트엠/Newsync) → 브랜드 필드로 분리(상품명 제외).</p>
+        <p style="margin:0"><b style="color:var(--ink)">무결점</b>: 불량화소 보증 제품만, <code style="font-family:var(--mono)">[무결점]</code> 대괄호로 <b>맨 끝 고정</b>. (CPU 규칙과 달리 모니터는 보증 태그를 상품명에 노출 — 의도적 예외)</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+let CATEGORY='cpu';
+/* ---------- 참조 데이터 ---------- */
+// 코드네임 표기 정규화 (변형 → 정식)
+const CN_CANON = {
+  '스카이레이크':'스카이레이크',
+  '카비레이크':'카비레이크','케이비레이크':'카비레이크','캐비레이크':'카비레이크',
+  '커피레이크':'커피레이크',
+  '커피레이크리프레시':'커피레이크 리프레시','커피레이크-r':'커피레이크 리프레시','커피레이크r':'커피레이크 리프레시',
+  '코멧레이크':'코멧레이크','코멧레이크리프레시':'코멧레이크','컴멧레이크':'코멧레이크',
+  '로켓레이크':'로켓레이크',
+  '앨더레이크':'앨더레이크','알더레이크':'앨더레이크',
+  '랩터레이크':'랩터레이크',
+  '랩터레이크리프레시':'랩터레이크 리프레시','랩터레이크-r':'랩터레이크 리프레시','랩터레이크r':'랩터레이크 리프레시',
+  '서밋릿지':'서밋 릿지','피나클릿지':'피나클 릿지','마티스':'마티스',
+  '버미어':'버미어','라파엘':'라파엘','그래니트릿지':'그래니트 릿지',
+  '튜린':'튜린','제노아':'제노아','베르가모':'베르가모',
+  '스카이레이크-sp':'스카이레이크-SP','스카이레이크sp':'스카이레이크-SP',
+  '캐스케이드레이크':'캐스케이드레이크','캐스케이드레이크sp':'캐스케이드레이크',
+  '아이스레이크-sp':'아이스레이크-SP','아이스레이크sp':'아이스레이크-SP',
+  '사파이어래피즈':'사파이어 래피즈','사파이어레피즈':'사파이어 래피즈',
+  '에메랄드래피즈':'에메랄드 래피즈','에메랄드레피즈':'에메랄드 래피즈',
+  '그래니트래피즈':'그래니트 래피즈','그래니트레피즈':'그래니트 래피즈',
+  '시에라포레스트':'시에라 포레스트','시에라포레스트sf':'시에라 포레스트'
+};
+const CN_SET = new Set(Object.values(CN_CANON));
+function canonCN(s){
+  const k = (s||'').toLowerCase().replace(/[\s\-]/g,'');
+  return CN_CANON[k] || (s||'').trim();
+}
+
+// 상품명에 있으면 안 되는 태그
+const STRAY = [
+  {re:/정품|벌크|병행|해외\s*구매|멀티\s*팩|트레이|tray|리테일/i, cat:'유통구분', dest:'부가제목'},
+  {re:/중고|리퍼|전시|미개봉|[SA]\s*급/i, cat:'상태', dest:'상태 필드'},
+  {re:/쿨러\s*(미포함|포함|없음|무)|무\s*쿨러/i, cat:'쿨러', dest:'부가제목'},
+  {re:/a\s*\/?\s*s\s*\d*\s*(개월|년|일)?|무상\s*as/i, cat:'A/S', dest:'부가제목'},
+  {re:/초특가|특가|당일\s*발송|무료\s*배송|이벤트|사은품/i, cat:'홍보문구', dest:'삭제(상품명 금지)'}
+];
+const SPEC_RE = /(\d+\s*C\b)|(\d+\s*T\b)|(\d+(\.\d+)?\s*GHz)|(\d+\s*MB)|(\d+\s*W\b)/i;
+
+/* ---------- 중요요약설명 규격 (EPYC 서버 CPU, 23슬롯 · 위치 기반) ---------- */
+const EPYC_SCHEMA = [
+  '제조사(소켓)','시리즈(아키텍처/코드네임)','공정','코어','스레드',
+  '기본클럭','최대클럭','All Core','L2','L3',
+  '기본TDP','cTDP','소켓구성(1P/2P)','PCIe','메모리규격',
+  '채널','메모리속도','메모리대역폭','ECC','내장그래픽',
+  '기술지원','쿨러','출시일'
+];
+// 슬롯별 소프트 검증 패턴 (순서 확인용, 없으면 skip)
+const SLOT_HINT = {2:/nm/i, 3:/코어|core|\d+\s*C/i, 4:/스레드|thread|\d+\s*T/i,
+  5:/ghz/i, 6:/ghz/i, 13:/pcie/i, 22:/\d{4}[-.]\d{1,2}[-.]\d{1,2}/};
+// 값에서 앞머리 라벨(예 "기본 클럭:") 제거
+function stripLabel(v){
+  const i=v.indexOf(':');
+  if(i>0){ const pre=v.slice(0,i).trim(); if(!/^\d/.test(pre)) return v.slice(i+1).trim(); }
+  return v;
+}
+function parseSpec(text){
+  const seg=text.split('|').map(s=>s.trim()).filter(s=>s.length);
+  const checks=[], rows=[];
+  // 슬롯 수
+  if(seg.length!==EPYC_SCHEMA.length){
+    checks.push({sev: seg.length<EPYC_SCHEMA.length?'err':'warn',
+      t:`슬롯 수 ${seg.length} / 규격 ${EPYC_SCHEMA.length}`,
+      d: seg.length<EPYC_SCHEMA.length?'누락 슬롯 있음. 아래 빈 칸 확인.':'초과 슬롯 있음. 병합/삭제 필요.'});
+  }else{
+    checks.push({sev:'ok',t:'슬롯 수 일치 (23/23)',d:'규격 슬롯 수와 일치.'});
+  }
+  // 위치 기반 매핑 + 소프트 순서검증
+  EPYC_SCHEMA.forEach((label,idx)=>{
+    const raw=seg[idx]!==undefined?seg[idx]:'';
+    rows.push({label, value: raw?stripLabel(raw):'', empty:!raw});
+    if(raw && SLOT_HINT[idx] && !SLOT_HINT[idx].test(raw)){
+      checks.push({sev:'warn',t:`슬롯 ${idx+1} 순서 확인`,d:`<code>${label}</code> 위치에 <code>${raw}</code> — 예상 형식과 다름. 순서 확인 필요.`});
+    }
+  });
+  // 메모리 속도 dual-value 고지 (Truth Protocol)
+  const memIdx=16; const memv=seg[memIdx]||'';
+  if(memv){
+    checks.push({sev:'unk',t:'메모리 속도 dual-value 확인',
+      d:`<code>${stripLabel(memv)}</code> — AMD 공식(1DPC) vs SP5 baseline 값이 다른 모델(예 9745/9535: 6400 vs 6000)은 조건 병기 필요. 자동 판정 안 함, 수동 확인.`});
+  }
+  return {rows,checks,count:seg.length};
+}
+
+/* ---------- 코드네임 추론 (Truth Protocol: 불확실=확인불가) ---------- */
+function inferCodename(maker, brand, model){
+  const b=(brand||''), m=(model||'').toUpperCase().replace(/\s+/g,''), mk=(maker||'').replace(/\s+/g,'');
+
+  // AMD EPYC
+  if(/EPYC/i.test(b)||/EPYC/i.test(m)){
+    const num=m.match(/\d{4}/);
+    if(num){
+      const last=num[0].slice(-1);
+      if(last==='5') return {cn:'튜린',conf:'medium',note:'끝자리 5 → 9005 시리즈 추론. Dense(c코어) 여부·정식 코드네임은 AMD 공식 재확인 권장'};
+      if(last==='4') return {cn:'제노아',conf:'medium',note:'끝자리 4 → 9004 시리즈 추론. c코어 모델은 베르가모. AMD 공식 재확인 권장'};
+    }
+    return {cn:null,conf:'unknown',note:'EPYC 모델 자동확인 불가 → 수동 검증'};
+  }
+  // AMD Ryzen
+  if(/라이젠|RYZEN/i.test(b)||/라이젠|RYZEN/i.test(mk)){
+    if(/G/.test(m.replace(/X3D/i,''))) return {cn:null,conf:'unknown',note:'APU(G 접미) 모델은 코드네임 상이(세잔/피카소 등) → 수동 검증'};
+    const num=m.match(/\d{4}/);
+    if(num){
+      const t=num[0][0];
+      const map={'1':'서밋 릿지','2':'피나클 릿지','3':'마티스','5':'버미어','7':'라파엘','9':'그래니트 릿지'};
+      if(map[t]) return {cn:map[t],conf:'confirmed',note:'라이젠 데스크톱 시리즈 규칙 기반'};
+      if(t==='4'||t==='8') return {cn:null,conf:'unknown',note:t+'000번대는 APU/모바일 계열 → 수동 검증'};
+    }
+    return {cn:null,conf:'unknown',note:'라이젠 모델 자동확인 불가 → 수동 검증'};
+  }
+  // Intel 계열
+  const isIntel = mk.includes('인텔')||/INTEL/i.test(mk)||/코어|CORE|펜티엄|PENTIUM|셀러론|CELERON|XEON|제온/i.test(b)||/^I[3579]/.test(m);
+  if(isIntel){
+    // ── Xeon 서버 (데스크톱 코어 규칙과 완전 분리) ──
+    if(/XEON|제온/i.test(b)){
+      const mm=m.match(/(\d{4})([A-Z+]*)/);
+      if(mm){
+        const num=mm[1], suf=mm[2]||'';
+        if(/P/.test(suf)) return {cn:'그래니트 래피즈',conf:'medium',note:'Xeon 6 P코어(P 접미) → 그래니트 래피즈. 인텔 ARK 확인 권장'};
+        if(/E/.test(suf)) return {cn:'시에라 포레스트',conf:'medium',note:'Xeon 6 E코어(E 접미) → 시에라 포레스트. 인텔 ARK 확인 권장'};
+        const d2=parseInt(num[1]);
+        const xmap={1:'스카이레이크-SP',2:'캐스케이드레이크',3:'아이스레이크-SP',4:'사파이어 래피즈',5:'에메랄드 래피즈'};
+        if(xmap[d2]) return {cn:xmap[d2],conf:'medium',note:`Xeon Scalable ${d2}세대(모델 둘째자리 규칙) → ${xmap[d2]}. 인텔 ARK 확인 권장`};
+      }
+      return {cn:null,conf:'unknown',note:'Xeon 모델 세대 자동판정 불가 → 인텔 ARK 수동 확인'};
+    }
+    if(/ULTRA|울트라/i.test(b)||/ULTRA/i.test(m)) return {cn:null,conf:'unknown',note:'코어 울트라(메테오/애로우레이크)는 시리즈별 상이 → 수동 검증'};
+    if(/펜티엄|PENTIUM|셀러론|CELERON/i.test(b)||/^G\d/.test(m)) return {cn:null,conf:'unknown',note:'펜티엄/셀러론은 모델별 세대 편차 큼 → 수동 검증'};
+    let brandGen=null; const bg=b.match(/(\d{1,2})\s*세대/); if(bg) brandGen=parseInt(bg[1]);
+    let modelGen=null;
+    const d=m.match(/I[3579]-?(\d{3,5})/)||m.match(/^(\d{3,5})/);
+    if(d){ const n=d[1]; modelGen = n.length>=5?parseInt(n.slice(0,2)):parseInt(n[0]); }
+    const gm={6:'스카이레이크',7:'카비레이크',8:'커피레이크',9:'커피레이크 리프레시',10:'코멧레이크',11:'로켓레이크',12:'앨더레이크',13:'랩터레이크',14:'랩터레이크 리프레시'};
+    if(brandGen&&modelGen&&brandGen!==modelGen)
+      return {cn:gm[modelGen]||null,conf:'conflict',note:`브랜드 세대(${brandGen}세대) ↔ 모델 세대(${modelGen}세대) 불일치`};
+    const g=modelGen||brandGen;
+    if(g&&gm[g]) return {cn:gm[g],conf:'confirmed',note:'인텔 코어 세대 규칙 기반'};
+    if(g) return {cn:null,conf:'unknown',note:g+'세대 코드네임 미등록 → 수동 검증'};
+    return {cn:null,conf:'unknown',note:'인텔 세대 추정 불가 → 수동 검증'};
+  }
+  return {cn:null,conf:'unknown',note:'제조사/브랜드 정보 부족 → 수동 검증'};
+}
+
+/* ---------- 상품명 파싱 ---------- */
+function parseName(name){
+  const parens=[...name.matchAll(/\(([^)]*)\)/g)].map(x=>x[1].trim());
+  const outside=name.replace(/\([^)]*\)/g,' ').replace(/\s+/g,' ').trim();
+  const model=(outside.split(/\s+/)[0]||'').trim(); // 선두 토큰 = 모델 후보
+  const leftover=outside.replace(model,'').trim(); // 괄호 밖 잔여 텍스트
+  const groups=parens.map(p=>{
+    if(SPEC_RE.test(p)) return {text:p,kind:'spec',dest:'중요요약설명 / 키워드'};
+    for(const s of STRAY){ if(s.re.test(p)) return {text:p,kind:'stray',cat:s.cat,dest:s.dest}; }
+    const c=canonCN(p);
+    if(CN_SET.has(c)||CN_SET.has(canonCN(c))) return {text:p,kind:'cn',canon:c};
+    return {text:p,kind:'unknown'};
+  });
+  // 괄호 밖 잔여 텍스트에도 stray 있는지
+  const leftoverStray=[];
+  if(leftover){ for(const s of STRAY){ if(s.re.test(leftover)) leftoverStray.push({text:leftover,cat:s.cat,dest:s.dest}); } }
+  return {model,groups,leftover,leftoverStray};
+}
+
+/* ==================================================================
+   모니터 카테고리 (공백 토큰 기반 · CPU 괄호 파서와 분리)
+   표준: 모델명 크기 해상도 싱크 HDR [무결점]
+   ================================================================== */
+const RES_CANON={ 'fhd':'FHD','풀hd':'FHD','fullhd':'FHD','1080p':'FHD',
+  'qhd':'QHD','1440p':'QHD','2k':'QHD','wqhd':'WQHD',
+  'uhd':'UHD','4k':'UHD','2160p':'UHD','8k':'8K','hd':'HD' };
+const MON_BRANDS=/^(newsync|뉴싱크|비트엠|bitm|삼성|samsung|lg|엘지|엠엔티|알파스캔|alphascan)$/i;
+// 크기: 두 자리 숫자(+소수 한 자리), 인치/형/"/inch 접미 허용
+const SIZE_RE=/^\d{2}(\.\d)?(인치|형|"|inch)?$/i;
+const SYNC_RE=/(프리\s*싱크|프리\s*씽크|freesync|지\s*싱크|g-?sync)/i;
+const RES_RE=/^(fhd|qhd|uhd|wqhd|풀hd|fullhd|1080p|1440p|2160p|4k|2k|8k|hd)$/i;
+const HDR_RE=/^hdr(10|400|600|1000|1400)?$/i;
+const PANEL_RE=/^(ips|va|tn|oled|qled|nano ?ips)$/i;
+const CURVE_RE=/(커브드|곡면|curved|평면)/i;
+
+function canonRes(s){ return RES_CANON[(s||'').toLowerCase().replace(/\s/g,'')] || (s||'').toUpperCase(); }
+function canonSync(s){
+  if(/지\s*싱크|g-?sync/i.test(s)) return '지싱크';
+  if(/프리\s*싱크|프리\s*씽크|freesync/i.test(s)) return '프리싱크';
+  return s;
+}
+
+function parseMonitorName(name){
+  const toks=name.split(/\s+/).filter(Boolean);
+  const r={model:null,size:null,res:null,refresh:null,sync:null,hdr:null,panel:null,curved:null,flawless:null,brandInName:[],unknown:[],lastIdx:toks.length-1};
+  toks.forEach((raw,i)=>{
+    const tk=raw.replace(/[\[\]]/g,'').trim();
+    if(/^무결점$/.test(tk)){ r.flawless={raw,idx:i,bracket:/\[.*\]/.test(raw)}; return; }
+    if(MON_BRANDS.test(tk)){ r.brandInName.push(raw); return; }
+    if(RES_RE.test(tk)){ if(!r.res) r.res={raw,idx:i}; else r.unknown.push(raw); return; }
+    if(/^\d+\s*hz$/i.test(tk)){ r.refresh={raw,idx:i,val:parseInt(tk)}; return; }
+    if(SIZE_RE.test(tk)){ if(!r.size) r.size={raw,idx:i,num:(tk.match(/[\d.]+/)||[''])[0]}; else r.unknown.push(raw); return; }
+    if(SYNC_RE.test(tk)){ r.sync={raw,idx:i}; return; }
+    if(HDR_RE.test(tk)){ r.hdr={raw,idx:i}; return; }
+    if(PANEL_RE.test(tk)){ r.panel={raw,idx:i}; return; }
+    if(CURVE_RE.test(tk)){ r.curved={raw,idx:i}; return; }
+    if(!r.model && /[a-z]/i.test(tk) && /\d/.test(tk)){ r.model={raw,idx:i}; return; }
+    r.unknown.push(raw);
+  });
+  return r;
+}
+
+function validateMonitor(){
+  const brand=v('brand'), name=v('name');
+  const checks=[], moves=[];
+  if(!name) return {checks:[{sev:'warn',t:'상품명이 비어있음',d:'상품명을 입력해줘.'}],std:'',moves:[]};
+  const P=parseMonitorName(name);
+
+  // 1) 모델명
+  if(!P.model) checks.push({sev:'warn',t:'모델명 미검출',d:'선두에 영숫자 모델명(예: <code>B225H</code>)이 필요해.'});
+  else checks.push({sev:'ok',t:'모델명 확인',d:`<code>${esc(P.model.raw)}</code>`});
+
+  // 2) 크기 (검색 노출 1순위)
+  if(!P.size){
+    checks.push({sev:'warn',t:'크기(인치) 누락',d:'모니터 검색 <b>1순위 키워드</b>인 크기가 상품명에 없음. 노출에 불리 — 추가 권장.'});
+  }else{
+    if(/인치|형|"|inch/i.test(P.size.raw)){
+      checks.push({sev:'warn',t:'크기 표기 정규화',d:`<code>${esc(P.size.raw)}</code> → <code>${esc(P.size.num)}</code> (규칙: 숫자만)`});
+    }else{
+      checks.push({sev:'ok',t:'크기 확인',d:`<code>${esc(P.size.num)}</code>`});
+    }
+  }
+
+  // 3) 해상도
+  if(!P.res){
+    checks.push({sev:'warn',t:'해상도 누락',d:'검색 2순위 해상도(<code>FHD/QHD/UHD</code>)가 없음. 추가 권장.'});
+  }else{
+    const cr=canonRes(P.res.raw);
+    if(cr!==P.res.raw) checks.push({sev:'warn',t:'해상도 표기 정규화',d:`<code>${esc(P.res.raw)}</code> → <code>${esc(cr)}</code> (약어 통일)`});
+    else checks.push({sev:'ok',t:'해상도 확인',d:`<code>${esc(cr)}</code>`});
+  }
+
+  // 4) 주사율 — 저주사율 생략 / 고주사율 유지
+  if(P.refresh){
+    if(P.refresh.val<=75){
+      checks.push({sev:'warn',t:'저주사율 상품명 노출',d:`<code>${esc(P.refresh.raw)}</code> — ${P.refresh.val}Hz는 검색 기여 낮음. <b>상품명에서 생략 권장</b>(스펙은 중요요약설명/키워드로).`});
+      moves.push({chip:P.refresh.raw,dest:'중요요약설명/키워드'});
+    }else if(P.refresh.val>=100){
+      checks.push({sev:'ok',t:'게이밍 주사율',d:`<code>${esc(P.refresh.raw)}</code> — 고주사율은 강력한 검색어. 크기 뒤로 노출.`});
+    }else{
+      checks.push({sev:'unk',t:'주사율 애매대역',d:`<code>${esc(P.refresh.raw)}</code> — 76~99Hz는 노출 가치 판단 필요.`});
+    }
+  }
+
+  // 5) 싱크
+  if(P.sync){
+    const cs=canonSync(P.sync.raw);
+    if(cs!==P.sync.raw) checks.push({sev:'warn',t:'싱크 표기 정규화',d:`<code>${esc(P.sync.raw)}</code> → <code>${esc(cs)}</code> (한글 통일)`});
+    else checks.push({sev:'ok',t:'싱크 확인',d:`<code>${esc(cs)}</code>`});
+  }
+
+  // 6) HDR (표기만 — 인증 등급은 스펙 영역)
+  if(P.hdr) checks.push({sev:'ok',t:'HDR 표기 유지',d:`<code>${esc(P.hdr.raw)}</code> — 상품명 유지. (VESA 인증 여부는 스펙 필드에서 별도 검증)`});
+
+  // 7) 브랜드가 상품명에 섞임 → 브랜드 필드로
+  P.brandInName.forEach(b=>{
+    checks.push({sev:'warn',t:'상품명에 브랜드 포함',d:`<code>${esc(b)}</code> → 브랜드 필드로 이동 (상품명 제외)`});
+    moves.push({chip:b,dest:'브랜드 필드'});
+  });
+
+  // 8) 무결점 — 맨 끝 & 대괄호
+  if(P.flawless){
+    if(P.flawless.idx!==P.lastIdx) checks.push({sev:'warn',t:'무결점 위치 오류',d:'<code>[무결점]</code>은 상품명 <b>맨 끝</b>에 와야 함.'});
+    if(!P.flawless.bracket) checks.push({sev:'warn',t:'무결점 대괄호 누락',d:`<code>${esc(P.flawless.raw)}</code> → <code>[무결점]</code> (대괄호로 감쌈)`});
+    if(P.flawless.idx===P.lastIdx && P.flawless.bracket) checks.push({sev:'ok',t:'무결점 표기 확인',d:'맨 끝 · 대괄호 정상.'});
+  }
+
+  // 9) 분류 불가 토큰
+  P.unknown.forEach(u=>checks.push({sev:'unk',t:'분류 불가 토큰',d:`<code>${esc(u)}</code> — 크기/해상도/싱크/HDR/무결점 어디에도 해당 안 됨. 확인 필요.`}));
+
+  // ── 표준 상품명 생성 ──
+  const parts=[];
+  if(P.model) parts.push(P.model.raw);
+  if(P.size) parts.push(P.size.num);                 // 숫자만
+  const gaming = P.refresh && P.refresh.val>=100;
+  if(gaming) parts.push(P.refresh.raw.replace(/\s+/g,'')); // 게이밍: 크기 뒤 주사율
+  if(P.res) parts.push(canonRes(P.res.raw));
+  if(P.sync) parts.push(canonSync(P.sync.raw));
+  if(P.panel && gaming) parts.push(P.panel.raw.toUpperCase()); // 패널은 게이밍에서만 노출
+  if(P.hdr) parts.push(P.hdr.raw.toUpperCase());
+  if(P.flawless) parts.push('[무결점]');             // 맨 끝 고정
+  const std=parts.join(' ');
+
+  return {checks,std,moves,mon:true};
+}
+
+/* ---------- 검증 ---------- */
+function validate(){
+  const maker=v('maker'),brand=v('brand'),name=v('name');
+  const checks=[], moves=[];
+  if(!name){ return {checks:[{sev:'warn',t:'상품명이 비어있음',d:'상품명을 입력해줘.'}],std:'',moves:[]}; }
+
+  const P=parseName(name);
+  const inf=inferCodename(maker,brand,P.model);
+
+  // 1) 제조사↔브랜드 정합성
+  const isAMDbrand=/라이젠|RYZEN|EPYC/i.test(brand), isIntelBrand=/코어|CORE|펜티엄|셀러론/i.test(brand);
+  if(maker){
+    if(maker.includes('인텔')&&isAMDbrand) checks.push({sev:'err',t:'제조사↔브랜드 불일치',d:`제조사 <code>${maker}</code> 인데 브랜드가 <code>${brand}</code>`});
+    else if(/AMD/i.test(maker)&&isIntelBrand) checks.push({sev:'err',t:'제조사↔브랜드 불일치',d:`제조사 <code>${maker}</code> 인데 브랜드가 <code>${brand}</code>`});
+  }
+  // 브랜드 ™/특수문자
+  if(/™|®/.test(brand)) checks.push({sev:'warn',t:'브랜드 특수문자',d:`<code>${brand}</code> — ™/® 사용 정책 미확정. 통일 규칙 필요.`});
+
+  // 2) 코드네임 사실검증
+  const cnGroup=P.groups.find(g=>g.kind==='cn');
+  if(inf.conf==='conflict'){
+    checks.push({sev:'err',t:'세대 정합성 오류',d:inf.note});
+  }
+  if(cnGroup){
+    if(inf.cn){
+      if(canonCN(cnGroup.canon)===canonCN(inf.cn)){
+        checks.push({sev:'ok',t:'코드네임 일치',d:`<code>${cnGroup.canon}</code> — ${inf.note}`});
+      }else{
+        checks.push({sev:'err',t:'코드네임 사실 오류',d:`상품명 <code>${cnGroup.text}</code> ↔ 추론 <code>${inf.cn}</code>. ${inf.note}`});
+      }
+    }else{
+      checks.push({sev:'unk',t:'코드네임 확인불가',d:`상품명 <code>${cnGroup.text}</code> 의 정합성 자동확인 불가. ${inf.note}`});
+    }
+    // 표기 정규화 필요?
+    if(cnGroup.text.trim()!==cnGroup.canon) checks.push({sev:'warn',t:'코드네임 표기 정규화',d:`<code>${cnGroup.text}</code> → <code>${cnGroup.canon}</code>`});
+  }else{
+    if(inf.cn) checks.push({sev:'warn',t:'코드네임 누락',d:`상품명에 코드네임 없음. 표준: <code>(${inf.cn})</code>. ${inf.note}`});
+    else checks.push({sev:'unk',t:'코드네임 없음 / 확인불가',d:inf.note});
+  }
+
+  // 3) 상품명 금지 요소 (stray / spec / unknown)
+  P.groups.forEach(g=>{
+    if(g.kind==='stray'){ checks.push({sev:'warn',t:`상품명에 ${g.cat} 포함`,d:`<code>(${g.text})</code> → ${g.dest}로 이동`}); moves.push({chip:g.text,dest:g.dest}); }
+    else if(g.kind==='spec'){ checks.push({sev:'warn',t:'상품명에 스펙 포함',d:`<code>(${g.text})</code> → 키워드로 이동 (풀 스펙은 중요요약설명)`}); moves.push({chip:g.text,dest:'키워드'}); }
+    else if(g.kind==='unknown'){ checks.push({sev:'unk',t:'분류 불가 괄호',d:`<code>(${g.text})</code> — 코드네임/유통/스펙 어디에도 해당 안 됨. 확인 필요.`}); }
+  });
+  P.leftoverStray.forEach(s=>{ checks.push({sev:'warn',t:`상품명(괄호 밖)에 ${s.cat} 포함`,d:`<code>${s.text}</code> → ${s.dest}로 이동`}); moves.push({chip:s.text,dest:s.dest}); });
+
+  // 4) 표준 상품명 생성
+  const cnFinal = cnGroup ? canonCN(cnGroup.canon) : (inf.cn||null);
+  let std = P.model + (cnFinal?` (${cnFinal})`:'');
+  if(!cnFinal) checks.push({sev:'unk',t:'표준안 코드네임 미정',d:'코드네임 확정 불가로 모델명만 표준안에 반영. 수동 확인 후 괄호 추가 필요.'});
+
+  // 5) 중요요약설명 스펙 (입력 시)
+  const specText=v('spec');
+  const specResult = specText ? parseSpec(specText) : null;
+
+  return {checks,std,moves,inf,specResult};
+}
+
+/* ---------- 렌더 ---------- */
+function run(){
+  const r = (CATEGORY==='monitor') ? validateMonitor() : validate();
+  const order={err:0,warn:1,unk:2,ok:3};
+  r.checks.sort((a,b)=>order[a.sev]-order[b.sev]);
+  const bmap={err:'b-err',warn:'b-warn',ok:'b-ok',unk:'b-unk'};
+  const lmap={err:'오류',warn:'경고',ok:'확인',unk:'확인불가'};
+
+  let html='';
+  if(r.std){
+    html+=`<div class="std"><div class="lab">표준 상품명 제안</div>
+      <div class="val" id="stdval">${esc(r.std)}</div>
+      <div class="copy"><button onclick="copyStd()">복사</button></div></div>`;
+  }
+  html+=`<div class="checks"><div class="card-h">검증 결과 · ${r.checks.length}건</div>`;
+  r.checks.forEach(c=>{
+    html+=`<div class="chk"><span class="badge ${bmap[c.sev]}">${lmap[c.sev]}</span>
+      <div class="body"><div class="t">${c.t}</div><div class="d">${c.d||''}</div></div></div>`;
+  });
+  html+=`</div>`;
+
+  if(r.moves.length){
+    html+=`<div class="movelist"><div class="card-h">필드 이동 제안</div>`;
+    r.moves.forEach(m=>{ html+=`<div class="move"><span class="chip">${esc(m.chip)}</span><span class="arrow">→</span><span class="dest">${m.dest}</span></div>`; });
+    html+=`</div>`;
+  }
+
+  if(r.specResult){
+    const s=r.specResult;
+    // 스펙 전용 체크
+    html+=`<div class="checks" style="margin-top:18px"><div class="card-h">중요요약설명 · 스펙 검증 (EPYC 서버)</div>`;
+    s.checks.forEach(c=>{
+      html+=`<div class="chk"><span class="badge ${bmap[c.sev]}">${lmap[c.sev]}</span>
+        <div class="body"><div class="t">${c.t}</div><div class="d">${c.d||''}</div></div></div>`;
+    });
+    html+=`</div>`;
+    // 정리된 중요요약설명 (라벨 행)
+    html+=`<div class="summary"><div class="card-h">중요요약설명 (정리본) · 이 필드에 입력</div><div class="sum-body">`;
+    s.rows.forEach(row=>{
+      html+=`<div class="sum-row${row.empty?' sum-empty':''}"><span class="sum-l">${esc(row.label)}</span><span class="sum-v">${row.empty?'— 누락 —':esc(row.value)}</span></div>`;
+    });
+    html+=`</div><div class="sum-foot"><button onclick="copySummary()">중요요약설명 복사</button></div>`;
+    // 복사용 plain text (숨김)
+    const plain=s.rows.map(row=>`${row.label} : ${row.empty?'':row.value}`).join('\n');
+    html+=`<textarea id="sumplain" style="position:absolute;left:-9999px" readonly>${esc(plain)}</textarea></div>`;
+  }
+
+  const noteCPU=`<b>판정 근거 안내.</b> 코드네임 사실검증은 인텔 코어 세대 규칙, 라이젠 시리즈 규칙, EPYC 끝자리 규칙에 기반한 <b>추론</b>이야. <b>펜티엄/셀러론, 라이젠 APU(G), 코어 울트라, EPYC Dense</b> 등은 자동 판정하지 않고 <b>확인불가</b>로 표시하니, 이 경우 AMD/인텔 공식 자료로 수동 확인해줘. 중요요약설명은 위치 기반 정렬·검증만 하며, <b>값 자체(코어수·TDP·출시일·메모리속도)는 입력값을 그대로 쓰고 지어내지 않아.</b>`;
+  const noteMON=`<b>모니터 규격 안내.</b> 표준 <code>모델명 크기 해상도 싱크 HDR [무결점]</code>. 크기·해상도는 검색 노출 핵심이라 상품명에 유지하고, <b>저주사율(≤75Hz)은 생략</b>·게이밍(≥100Hz)은 크기 뒤로 노출해. 브랜드(비트엠/Newsync)는 브랜드 필드, 무결점은 <code>[무결점]</code>로 맨 끝 고정. <b>HDR은 표기만 검사</b>하고 실제 VESA 인증 등급(예: HDR400 미달)은 이 도구가 판정하지 않으니 스펙 필드에서 별도 확인해줘. 이 규격은 <b>사무/일반 라인 기준(제안)</b>이며 확정 표준은 담당자 결정 사항이야.`;
+  html+=`<div class="note">${CATEGORY==='monitor'?noteMON:noteCPU}</div>`;
+
+  document.getElementById('out').innerHTML=html;
+  document.getElementById('out').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ---------- 유틸 & 프리셋 ---------- */
+function v(id){return document.getElementById(id).value.trim();}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function copyStd(){const t=document.getElementById('stdval').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);}
+function copySummary(){const el=document.getElementById('sumplain');if(el){el.select();navigator.clipboard&&navigator.clipboard.writeText(el.value);}}
+const PRESETS={
+  'i5-6600':{maker:'인텔',brand:'코어i5-6세대',name:'6600 (스카이레이크) (벌크) (중고) (쿨러미포함) (A/S 1개)',sub:'',kw:'',spec:''},
+  'i9-9900KF':{maker:'인텔',brand:'코어i9-9세대',name:'i9-9900KF (커피레이크-R) (정품) (쿨러미포함)',sub:'',kw:'',spec:''},
+  '9800X3D':{maker:'AMD',brand:'라이젠7',name:'라이젠7 9800X3D (버미어) 정품',sub:'',kw:'',spec:''},
+  'EPYC9535':{maker:'AMD',brand:'EPYC™',name:'9535 (64C / 128T / 2.4GHz / 256MB)',sub:'※ 트레이(Tray) 상품 / 리드타임 : 영업일 3~7일',kw:'100-100000043WOF',
+    spec:'AMD(소켓SP5/FC-LGA6096)|EPYC 9004 시리즈(Zen4/Genoa)|5nm|16코어|32스레드|기본 클럭:3.0GHz|최대 클럭:3.7GHz|All Core:3.6GHz|L2 캐시:16MB|L3 캐시:64MB|기본 TDP:200W|cTDP:200~240W|1P/2P 지원|PCIe5.0 x128|메모리 규격:DDR5|12채널|메모리 속도:최대 4800MT/s|메모리 대역폭:460.8GB/s(소켓당)|ECC 지원|내장그래픽:미탑재|기술 지원:SMT,AMD Infinity Guard,AMD Infinity Architecture|쿨러:미포함|출시일:2022-11-10'},
+  'G4400':{maker:'인텔',brand:'펜티엄',name:'G4400 (스카이레이크)(중고)',sub:'',kw:'',spec:''},
+  'Xeon8460':{maker:'인텔',brand:'제온',name:'8460Y+ (캐스케이드레이크) Tray',sub:'',kw:'인텔,제온,플래티넘,8460Y+,xeon,cpu,서버',spec:''},
+  'Xeon6767P':{maker:'인텔',brand:'제온',name:'6767P (그래니트래피즈) Tray',sub:'',kw:'인텔,제온,6767P,xeon,cpu,서버',spec:''},
+  // ── 모니터 ──
+  'B225H':{cat:'monitor',maker:'비트엠',brand:'Newsync',name:'B225H 21.5 FHD 프리싱크 HDR [무결점]',sub:'',kw:'',spec:''},
+  'B225H_raw':{cat:'monitor',maker:'비트엠',brand:'Newsync',name:'Newsync B225H 21.5인치 풀HD FreeSync HDR 75Hz 무결점',sub:'',kw:'',spec:''},
+  'MON_game':{cat:'monitor',maker:'',brand:'',name:'M27Q 27 165Hz QHD 프리싱크 IPS HDR [무결점]',sub:'',kw:'',spec:''}
+};
+function setCat(c){
+  CATEGORY=c;
+  const isMon=(c==='monitor');
+  document.getElementById('cat-cpu').classList.toggle('on',!isMon);
+  document.getElementById('cat-mon').classList.toggle('on',isMon);
+  document.getElementById('spec-cpu').classList.toggle('hidden',isMon);
+  document.getElementById('spec-mon').classList.toggle('hidden',!isMon);
+  document.getElementById('presets-cpu').classList.toggle('hidden',isMon);
+  document.getElementById('presets-mon').classList.toggle('hidden',!isMon);
+  document.getElementById('spec-field').classList.toggle('hidden',isMon); // EPYC 스펙칸은 CPU 전용
+  // 라벨/플레이스홀더 전환
+  document.getElementById('lb-maker').textContent = isMon ? '제조사 (브랜드)' : '제조사';
+  document.getElementById('lb-brand').textContent = isMon ? '제품라인' : '브랜드';
+  maker.placeholder = isMon ? '예: 비트엠' : '예: 인텔';
+  brand.placeholder = isMon ? '예: Newsync' : '예: 코어i5-6세대';
+  name.placeholder  = isMon ? '예: B225H 21.5 FHD 프리싱크 HDR [무결점]' : '예: 6600 (스카이레이크) (벌크) (중고)';
+  document.getElementById('out').innerHTML='';
+}
+function fill(k){
+  const p=PRESETS[k];
+  setCat(p.cat||'cpu');
+  maker.value=p.maker;brand.value=p.brand;name.value=p.name;sub.value=p.sub;kw.value=p.kw;
+  document.getElementById('spec').value=p.spec||'';
+  run();
+}
+</script>
