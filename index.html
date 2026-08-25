@@ -1,5 +1,5 @@
 <!--
-  CNO — Chief Naming Officer (CPU 상품명 검증기)
+  CNO — Chief Naming Officer (상품명 검증기: CPU · 모니터)
   Romi Lab · author: Rom Kim (romi4670)
   - 입력: 제조사 / 브랜드 / 상품명 / 부가제목 / 키워드 (복붙, 1건 단위)
   - 규격: 상품명 = 모델명 (정식 코드네임)  / 괄호 앞 1칸
@@ -8,7 +8,7 @@
 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CNO — 상품명 검증기 (CPU · 모니터) · Romi Lab</title>
+<title>CNO — 상품명 검증기 · Romi Lab</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -115,37 +115,27 @@
     .std,.checks,.movelist{animation:rise .28s ease both}
     @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   }
-  /* 카테고리 토글 */
-  .cattog{display:flex;gap:0;margin-bottom:16px;border:1px solid var(--hair);border-radius:4px;overflow:hidden;width:fit-content}
-  .cattog button{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.08em;
-    padding:8px 20px;border:none;background:var(--panel);color:var(--ink-soft);cursor:pointer;text-transform:uppercase}
-  .cattog button+button{border-left:1px solid var(--hair)}
-  .cattog button.on{background:var(--indigo);color:#fff}
 </style>
 
 <div class="wrap">
   <header>
     <div class="eyebrow">CNO · Chief Naming Officer &nbsp;|&nbsp; Romi Lab</div>
     <h1>CNO — 상품명 검증기</h1>
-    <div class="sub" id="subline">CPU · 모니터 카테고리 &nbsp;|&nbsp; 규격 검사 · 필드 분리 제안 &nbsp;|&nbsp; 회사 데이터 미포함 · 1건 단위</div>
+    <div class="sub">CPU · 모니터 자동 판별 &nbsp;|&nbsp; 코드네임 사실검증 · 스펙 규격 검증 · 필드 분리 제안 &nbsp;|&nbsp; 회사 데이터 미포함 · 1건 단위</div>
   </header>
 
   <div class="grid">
     <div class="card">
-      <div class="card-h">입력 · 신관리자 필드 그대로 붙여넣기</div>
+      <div class="card-h">입력 · 관리자 상품 필드 붙여넣기</div>
       <div class="card-b">
-        <div class="cattog">
-          <button id="cat-cpu" class="on" onclick="setCat('cpu')">CPU</button>
-          <button id="cat-mon" onclick="setCat('monitor')">모니터</button>
-        </div>
-        <div class="field"><label id="lb-maker">제조사</label><input id="maker" placeholder="예: 인텔"></div>
-        <div class="field"><label id="lb-brand">브랜드</label><input id="brand" placeholder="예: 코어i5-6세대"></div>
+        <div class="field"><label>제조사</label><input id="maker" placeholder="예: 인텔"></div>
+        <div class="field"><label>브랜드</label><input id="brand" placeholder="예: 코어i5-6세대"></div>
         <div class="field"><label>상품명</label><input id="name" placeholder="예: 6600 (스카이레이크) (벌크) (중고)"></div>
         <div class="field"><label>부가제목</label><textarea id="sub"></textarea></div>
         <div class="field"><label>키워드</label><textarea id="kw"></textarea></div>
-        <div class="field" id="spec-field"><label>중요요약설명 스펙 · EPYC 서버 (파이프 <span style="font-family:var(--mono)">|</span> 구분, 선택)</label><textarea id="spec" placeholder="예: AMD(소켓SP5/...)|EPYC 9004 시리즈(Zen4/Genoa)|5nm|16코어|..."></textarea></div>
+        <div class="field"><label>중요요약설명 스펙 · EPYC 서버 (파이프 <span style="font-family:var(--mono)">|</span> 구분, 선택)</label><textarea id="spec" placeholder="예: AMD(소켓SP5/...)|EPYC 9004 시리즈(Zen4/Genoa)|5nm|16코어|..."></textarea></div>
         <button class="btn btn-run" onclick="run()">검증하기</button>
-        <div class="presets" id="presets-cpu">
+        <div class="presets">
           <button class="btn btn-ghost" onclick="fill('i5-6600')">i5-6600</button>
           <button class="btn btn-ghost" onclick="fill('i9-9900KF')">i9-9900KF</button>
           <button class="btn btn-ghost" onclick="fill('9800X3D')">9800X3D</button>
@@ -153,32 +143,20 @@
           <button class="btn btn-ghost" onclick="fill('G4400')">G4400</button>
           <button class="btn btn-ghost" onclick="fill('Xeon8460')">Xeon 8460Y+</button>
           <button class="btn btn-ghost" onclick="fill('Xeon6767P')">Xeon 6767P</button>
-        </div>
-        <div class="presets hidden" id="presets-mon">
-          <button class="btn btn-ghost" onclick="fill('B225H')">B225H (기준)</button>
-          <button class="btn btn-ghost" onclick="fill('B225H_raw')">B225H (정리 전)</button>
-          <button class="btn btn-ghost" onclick="fill('MON_game')">게이밍 예시</button>
+          <button class="btn btn-ghost" onclick="fill('MonSamsung')">모니터 삼성</button>
+          <button class="btn btn-ghost" onclick="fill('MonPhilips')">모니터 24E1N</button>
+          <button class="btn btn-ghost" onclick="fill('MonOmen')">모니터 OMEN</button>
         </div>
       </div>
     </div>
 
-    <div class="card" id="spec-cpu">
-      <div class="card-h">규격 정의 · CPU (확정)</div>
+    <div class="card">
+      <div class="card-h">규격 정의 (확정)</div>
       <div class="card-b" style="font-size:13.5px;color:var(--ink-soft);line-height:1.7">
         <p style="margin:0 0 10px"><b style="color:var(--ink)">상품명</b> = <code style="font-family:var(--mono)">모델명 (코드네임)</code><br>제조사·브랜드가 별도 필드에 세팅되므로 상품명은 모델명부터 시작.</p>
         <p style="margin:0 0 10px"><b style="color:var(--ink)">코드네임</b>은 정식 명칭, 괄호 1개, 괄호 앞 띄어쓰기 1칸.<br>예: <code style="font-family:var(--mono)">커피레이크 리프레시</code> (✗ 커피레이크-R)</p>
         <p style="margin:0 0 10px"><b style="color:var(--ink)">상품명 금지</b>: 유통구분·상태·쿨러·A/S·스펙·홍보문구 → 각 필드로 분리.</p>
         <p style="margin:0"><b style="color:var(--ink)">사실검증</b>: 모델↔코드네임 정합성을 규칙 기반으로 확인. 추론 불가 모델은 허위판정 대신 <b style="color:var(--unk)">확인불가</b>로 표시.</p>
-      </div>
-    </div>
-    <div class="card hidden" id="spec-mon">
-      <div class="card-h">규격 정의 · 모니터 (사무/일반 라인)</div>
-      <div class="card-b" style="font-size:13.5px;color:var(--ink-soft);line-height:1.7">
-        <p style="margin:0 0 10px"><b style="color:var(--ink)">상품명</b> = <code style="font-family:var(--mono)">모델명 크기 해상도 싱크 HDR [무결점]</code><br>예: <code style="font-family:var(--mono)">B225H 21.5 FHD 프리싱크 HDR [무결점]</code></p>
-        <p style="margin:0 0 10px"><b style="color:var(--ink)">표기 규칙</b>: 크기=숫자만(<code>21.5</code>) · 해상도=약어(<code>FHD/QHD/UHD</code>) · 싱크=한글(<code>프리싱크</code>) · HDR 유지.</p>
-        <p style="margin:0 0 10px"><b style="color:var(--ink)">노출 순서</b>: 크기 &gt; 해상도 &gt; 싱크·HDR. <b>저주사율(≤75Hz)은 상품명에서 생략</b>(검색 기여 낮음). 게이밍(≥100Hz)은 주사율을 크기 뒤로 노출.</p>
-        <p style="margin:0 0 10px"><b style="color:var(--ink)">브랜드</b>(비트엠/Newsync) → 브랜드 필드로 분리(상품명 제외).</p>
-        <p style="margin:0"><b style="color:var(--ink)">무결점</b>: 불량화소 보증 제품만, <code style="font-family:var(--mono)">[무결점]</code> 대괄호로 <b>맨 끝 고정</b>. (CPU 규칙과 달리 모니터는 보증 태그를 상품명에 노출 — 의도적 예외)</p>
       </div>
     </div>
   </div>
@@ -187,7 +165,6 @@
 </div>
 
 <script>
-let CATEGORY='cpu';
 /* ---------- 참조 데이터 ---------- */
 // 코드네임 표기 정규화 (변형 → 정식)
 const CN_CANON = {
@@ -350,138 +327,101 @@ function parseName(name){
   return {model,groups,leftover,leftoverStray};
 }
 
-/* ==================================================================
-   모니터 카테고리 (공백 토큰 기반 · CPU 괄호 파서와 분리)
-   표준: 모델명 크기 해상도 싱크 HDR [무결점]
-   ================================================================== */
-const RES_CANON={ 'fhd':'FHD','풀hd':'FHD','fullhd':'FHD','1080p':'FHD',
-  'qhd':'QHD','1440p':'QHD','2k':'QHD','wqhd':'WQHD',
-  'uhd':'UHD','4k':'UHD','2160p':'UHD','8k':'8K','hd':'HD' };
-const MON_BRANDS=/^(newsync|뉴싱크|비트엠|bitm|삼성|samsung|lg|엘지|엠엔티|알파스캔|alphascan)$/i;
-// 크기: 두 자리 숫자(+소수 한 자리), 인치/형/"/inch 접미 허용
-const SIZE_RE=/^\d{2}(\.\d)?(인치|형|"|inch)?$/i;
-const SYNC_RE=/(프리\s*싱크|프리\s*씽크|freesync|지\s*싱크|g-?sync)/i;
-const RES_RE=/^(fhd|qhd|uhd|wqhd|풀hd|fullhd|1080p|1440p|2160p|4k|2k|8k|hd)$/i;
-const HDR_RE=/^hdr(10|400|600|1000|1400)?$/i;
-const PANEL_RE=/^(ips|va|tn|oled|qled|nano ?ips)$/i;
-const CURVE_RE=/(커브드|곡면|curved|평면)/i;
-
-function canonRes(s){ return RES_CANON[(s||'').toLowerCase().replace(/\s/g,'')] || (s||'').toUpperCase(); }
-function canonSync(s){
-  if(/지\s*싱크|g-?sync/i.test(s)) return '지싱크';
-  if(/프리\s*싱크|프리\s*씽크|freesync/i.test(s)) return '프리싱크';
-  return s;
+/* ---------- 검증 ---------- */
+/* 카테고리 자동 감지 */
+function detectCategory(maker,brand,name){
+  const t=brand+' '+name+' '+maker;
+  if(/코어|라이젠|RYZEN|제온|XEON|EPYC|펜티엄|PENTIUM|셀러론|CELERON/i.test(t)) return 'cpu';
+  if(/인치|IPS|\bVA\b|\bTN\b|FHD|QHD|UHD|WQHD|UWQHD|보더리스|모니터|\d+\s*Hz|커브드|커브|피벗/i.test(t)) return 'monitor';
+  return 'cpu';
 }
 
-function parseMonitorName(name){
-  const toks=name.split(/\s+/).filter(Boolean);
-  const r={model:null,size:null,res:null,refresh:null,sync:null,hdr:null,panel:null,curved:null,flawless:null,brandInName:[],unknown:[],lastIdx:toks.length-1};
-  toks.forEach((raw,i)=>{
-    const tk=raw.replace(/[\[\]]/g,'').trim();
-    if(/^무결점$/.test(tk)){ r.flawless={raw,idx:i,bracket:/\[.*\]/.test(raw)}; return; }
-    if(MON_BRANDS.test(tk)){ r.brandInName.push(raw); return; }
-    if(RES_RE.test(tk)){ if(!r.res) r.res={raw,idx:i}; else r.unknown.push(raw); return; }
-    if(/^\d+\s*hz$/i.test(tk)){ r.refresh={raw,idx:i,val:parseInt(tk)}; return; }
-    if(SIZE_RE.test(tk)){ if(!r.size) r.size={raw,idx:i,num:(tk.match(/[\d.]+/)||[''])[0]}; else r.unknown.push(raw); return; }
-    if(SYNC_RE.test(tk)){ r.sync={raw,idx:i}; return; }
-    if(HDR_RE.test(tk)){ r.hdr={raw,idx:i}; return; }
-    if(PANEL_RE.test(tk)){ r.panel={raw,idx:i}; return; }
-    if(CURVE_RE.test(tk)){ r.curved={raw,idx:i}; return; }
-    if(!r.model && /[a-z]/i.test(tk) && /\d/.test(tk)){ r.model={raw,idx:i}; return; }
-    r.unknown.push(raw);
-  });
-  return r;
-}
-
-function validateMonitor(){
-  const brand=v('brand'), name=v('name');
+/* 모니터 전용 검증 (누락 탐지 + 표기 정규화 중심) */
+const MON_RES=['FHD','QHD','UHD','WQHD','UWQHD','4K','5K'];
+const REFRESH=[60,75,90,100,120,144,165,180,200,240,280,300,360];
+const MON_JUNK=[/게이밍\s*모니터/,/(?<!커브드\s)모니터$/,/후속\s*모델/,/신제품/,/초특가|특가|무료배송|당일발송/];
+function validateMonitor(maker,brand,name){
   const checks=[], moves=[];
-  if(!name) return {checks:[{sev:'warn',t:'상품명이 비어있음',d:'상품명을 입력해줘.'}],std:'',moves:[]};
-  const P=parseMonitorName(name);
+  const N=name.replace(/\s+/g,' ').trim();
+  const tokens=N.split(' ');
 
-  // 1) 모델명
-  if(!P.model) checks.push({sev:'warn',t:'모델명 미검출',d:'선두에 영숫자 모델명(예: <code>B225H</code>)이 필요해.'});
-  else checks.push({sev:'ok',t:'모델명 확인',d:`<code>${esc(P.model.raw)}</code>`});
-
-  // 2) 크기 (검색 노출 1순위)
-  if(!P.size){
-    checks.push({sev:'warn',t:'크기(인치) 누락',d:'모니터 검색 <b>1순위 키워드</b>인 크기가 상품명에 없음. 노출에 불리 — 추가 권장.'});
-  }else{
-    if(/인치|형|"|inch/i.test(P.size.raw)){
-      checks.push({sev:'warn',t:'크기 표기 정규화',d:`<code>${esc(P.size.raw)}</code> → <code>${esc(P.size.num)}</code> (규칙: 숫자만)`});
-    }else{
-      checks.push({sev:'ok',t:'크기 확인',d:`<code>${esc(P.size.num)}</code>`});
-    }
+  // 모델명 = 첫 토큰
+  const model=tokens[0]||'';
+  // 크기
+  const sizeM=N.match(/(\d{2,3})\s*인치/)||N.match(/(\d{2,3})\s*"/)||N.match(/(\d{2,3}(?:\.\d)?)\s*cm/);
+  const size=sizeM?sizeM[1]:null;
+  // 패널형태
+  const form = /커브드|커브|curved/i.test(N)?'커브드':(/평면|flat/i.test(N)?'평면':null);
+  // 패널종류
+  const panelM=N.match(/\b(IPS|VA|TN)\b/i); const panel=panelM?panelM[1].toUpperCase():null;
+  // 해상도
+  const res=MON_RES.find(r=>new RegExp('\\b'+r+'\\b','i').test(N))||null;
+  // 주사율: Hz 붙은 값
+  const hzM=N.match(/(\d{2,3})\s*Hz/i);
+  let refresh=hzM?hzM[1]:null, hzBare=null;
+  if(!refresh){
+    // 단위 없는 주사율 후보 탐지 (밝기 혼동)
+    const nums=[...N.matchAll(/\b(\d{2,3})\b/g)].map(x=>parseInt(x[1]));
+    hzBare=nums.find(n=>REFRESH.includes(n) && n!==parseInt(size));
   }
+  // 특징
+  const feats=[];
+  [[/보더리스/,'보더리스'],[/4면\s*보더리스/,'4면보더리스'],[/높낮이/,'높낮이'],[/USB-?C/i,'USB-C'],
+   [/무결점/,'무결점'],[/시력보호/,'시력보호'],[/아이\s*케어|eye\s*care/i,'아이케어'],[/피벗/,'피벗'],
+   [/회전/,'회전'],[/화이트/,'화이트'],[/블랙/,'블랙']].forEach(([re,label])=>{ if(re.test(N)&&!feats.includes(label)) feats.push(label); });
 
-  // 3) 해상도
-  if(!P.res){
-    checks.push({sev:'warn',t:'해상도 누락',d:'검색 2순위 해상도(<code>FHD/QHD/UHD</code>)가 없음. 추가 권장.'});
-  }else{
-    const cr=canonRes(P.res.raw);
-    if(cr!==P.res.raw) checks.push({sev:'warn',t:'해상도 표기 정규화',d:`<code>${esc(P.res.raw)}</code> → <code>${esc(cr)}</code> (약어 통일)`});
-    else checks.push({sev:'ok',t:'해상도 확인',d:`<code>${esc(cr)}</code>`});
+  // ── 검증 ──
+  // 모델명 (제품군만 있는지)
+  if(!/[A-Z].*\d|\d.*[A-Z]/i.test(model) || /^(OMEN|삼성|LG|AOC|주연|알파스캔)$/i.test(model)){
+    checks.push({sev:'warn',t:'풀 모델명 확인',d:`<code>${model}</code> — 제품군/브랜드로 보임. 풀 모델명(영문+숫자 코드) 확인 필요.`});
   }
+  // 크기 (필수)
+  if(size) checks.push({sev:'ok',t:'크기 확인',d:`${size}인치`});
+  else checks.push({sev:'err',t:'크기 누락',d:'상품명에 크기(예 24인치) 없음. 필수.'});
+  // 해상도 (필수)
+  if(res) checks.push({sev:'ok',t:'해상도 확인',d:res});
+  else checks.push({sev:'err',t:'해상도 누락',d:'FHD/QHD/UHD 등 해상도 없음. 필수.'});
+  // 패널종류
+  if(panel){ if(panelM[1]!==panel||/패널/.test(N)) checks.push({sev:'warn',t:'패널 표기 정규화',d:`<code>${panelM[0]}</code> → <code>${panel}</code>`}); }
+  else checks.push({sev:'warn',t:'패널종류 누락',d:'IPS/VA/TN 표기 권장.'});
+  // 패널형태
+  if(!form) checks.push({sev:'warn',t:'패널형태 누락',d:'평면/커브드 표기 권장.'});
+  // 주사율
+  if(refresh) checks.push({sev:'ok',t:'주사율 확인',d:`${refresh}Hz`});
+  else if(hzBare) checks.push({sev:'err',t:'주사율 단위 누락',d:`<code>${hzBare}</code> → <code>${hzBare}Hz</code> (단위 없으면 밝기와 혼동)`});
+  else checks.push({sev:'warn',t:'주사율 표기 권장',d:'주사율(예 100Hz) 표기 권장.'});
+  // 카테고리 중복어/마케팅 문구
+  MON_JUNK.forEach(re=>{ const mm=N.match(re); if(mm) checks.push({sev:'warn',t:'상품명 정리 대상',d:`<code>${mm[0]}</code> — 카테고리 중복어/마케팅 문구, 제거 권장.`}); });
+  // 괄호 마케팅
+  const paren=[...N.matchAll(/\(([^)]*)\)/g)].map(x=>x[1]);
+  paren.forEach(p=>{ checks.push({sev:'warn',t:'괄호 문구 확인',d:`<code>(${p})</code> — 후속모델 등 마케팅 정보면 부제로 이동.`}); moves.push({chip:p,dest:'부가제목/상품메모'}); });
 
-  // 4) 주사율 — 저주사율 생략 / 고주사율 유지
-  if(P.refresh){
-    if(P.refresh.val<=75){
-      checks.push({sev:'warn',t:'저주사율 상품명 노출',d:`<code>${esc(P.refresh.raw)}</code> — ${P.refresh.val}Hz는 검색 기여 낮음. <b>상품명에서 생략 권장</b>(스펙은 중요요약설명/키워드로).`});
-      moves.push({chip:P.refresh.raw,dest:'중요요약설명/키워드'});
-    }else if(P.refresh.val>=100){
-      checks.push({sev:'ok',t:'게이밍 주사율',d:`<code>${esc(P.refresh.raw)}</code> — 고주사율은 강력한 검색어. 크기 뒤로 노출.`});
-    }else{
-      checks.push({sev:'unk',t:'주사율 애매대역',d:`<code>${esc(P.refresh.raw)}</code> — 76~99Hz는 노출 가치 판단 필요.`});
-    }
-  }
-
-  // 5) 싱크
-  if(P.sync){
-    const cs=canonSync(P.sync.raw);
-    if(cs!==P.sync.raw) checks.push({sev:'warn',t:'싱크 표기 정규화',d:`<code>${esc(P.sync.raw)}</code> → <code>${esc(cs)}</code> (한글 통일)`});
-    else checks.push({sev:'ok',t:'싱크 확인',d:`<code>${esc(cs)}</code>`});
-  }
-
-  // 6) HDR (표기만 — 인증 등급은 스펙 영역)
-  if(P.hdr) checks.push({sev:'ok',t:'HDR 표기 유지',d:`<code>${esc(P.hdr.raw)}</code> — 상품명 유지. (VESA 인증 여부는 스펙 필드에서 별도 검증)`});
-
-  // 7) 브랜드가 상품명에 섞임 → 브랜드 필드로
-  P.brandInName.forEach(b=>{
-    checks.push({sev:'warn',t:'상품명에 브랜드 포함',d:`<code>${esc(b)}</code> → 브랜드 필드로 이동 (상품명 제외)`});
-    moves.push({chip:b,dest:'브랜드 필드'});
-  });
-
-  // 8) 무결점 — 맨 끝 & 대괄호
-  if(P.flawless){
-    if(P.flawless.idx!==P.lastIdx) checks.push({sev:'warn',t:'무결점 위치 오류',d:'<code>[무결점]</code>은 상품명 <b>맨 끝</b>에 와야 함.'});
-    if(!P.flawless.bracket) checks.push({sev:'warn',t:'무결점 대괄호 누락',d:`<code>${esc(P.flawless.raw)}</code> → <code>[무결점]</code> (대괄호로 감쌈)`});
-    if(P.flawless.idx===P.lastIdx && P.flawless.bracket) checks.push({sev:'ok',t:'무결점 표기 확인',d:'맨 끝 · 대괄호 정상.'});
-  }
-
-  // 9) 분류 불가 토큰
-  P.unknown.forEach(u=>checks.push({sev:'unk',t:'분류 불가 토큰',d:`<code>${esc(u)}</code> — 크기/해상도/싱크/HDR/무결점 어디에도 해당 안 됨. 확인 필요.`}));
-
-  // ── 표준 상품명 생성 ──
-  const parts=[];
-  if(P.model) parts.push(P.model.raw);
-  if(P.size) parts.push(P.size.num);                 // 숫자만
-  const gaming = P.refresh && P.refresh.val>=100;
-  if(gaming) parts.push(P.refresh.raw.replace(/\s+/g,'')); // 게이밍: 크기 뒤 주사율
-  if(P.res) parts.push(canonRes(P.res.raw));
-  if(P.sync) parts.push(canonSync(P.sync.raw));
-  if(P.panel && gaming) parts.push(P.panel.raw.toUpperCase()); // 패널은 게이밍에서만 노출
-  if(P.hdr) parts.push(P.hdr.raw.toUpperCase());
-  if(P.flawless) parts.push('[무결점]');             // 맨 끝 고정
+  // 표준 상품명 생성
+  const parts=[model];
+  parts.push(size?size+'인치':'[크기?]');
+  if(form) parts.push(form);
+  parts.push(panel||'[패널?]');
+  parts.push(res||'[해상도?]');
+  const rf=refresh||hzBare; if(rf) parts.push(rf+'Hz');
+  feats.forEach(f=>parts.push(f));
   const std=parts.join(' ');
 
-  return {checks,std,moves,mon:true};
+  return {checks,std,moves,category:'monitor'};
 }
 
-/* ---------- 검증 ---------- */
 function validate(){
   const maker=v('maker'),brand=v('brand'),name=v('name');
   const checks=[], moves=[];
   if(!name){ return {checks:[{sev:'warn',t:'상품명이 비어있음',d:'상품명을 입력해줘.'}],std:'',moves:[]}; }
+
+  // 카테고리 분기
+  const cat=detectCategory(maker,brand,name);
+  if(cat==='monitor'){
+    const mr=validateMonitor(maker,brand,name);
+    const specText=v('spec');
+    mr.specResult = specText ? parseSpec(specText) : null;
+    return mr;
+  }
 
   const P=parseName(name);
   const inf=inferCodename(maker,brand,P.model);
@@ -534,18 +474,20 @@ function validate(){
   const specText=v('spec');
   const specResult = specText ? parseSpec(specText) : null;
 
-  return {checks,std,moves,inf,specResult};
+  return {checks,std,moves,inf,specResult,category:'cpu'};
 }
 
 /* ---------- 렌더 ---------- */
 function run(){
-  const r = (CATEGORY==='monitor') ? validateMonitor() : validate();
+  const r=validate();
   const order={err:0,warn:1,unk:2,ok:3};
   r.checks.sort((a,b)=>order[a.sev]-order[b.sev]);
   const bmap={err:'b-err',warn:'b-warn',ok:'b-ok',unk:'b-unk'};
   const lmap={err:'오류',warn:'경고',ok:'확인',unk:'확인불가'};
 
   let html='';
+  const catLabel = r.category==='monitor' ? '모니터' : 'CPU';
+  html+=`<div style="font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--indigo);margin-bottom:10px;text-transform:uppercase">검증 모드 · ${catLabel}</div>`;
   if(r.std){
     html+=`<div class="std"><div class="lab">표준 상품명 제안</div>
       <div class="val" id="stdval">${esc(r.std)}</div>
@@ -584,9 +526,7 @@ function run(){
     html+=`<textarea id="sumplain" style="position:absolute;left:-9999px" readonly>${esc(plain)}</textarea></div>`;
   }
 
-  const noteCPU=`<b>판정 근거 안내.</b> 코드네임 사실검증은 인텔 코어 세대 규칙, 라이젠 시리즈 규칙, EPYC 끝자리 규칙에 기반한 <b>추론</b>이야. <b>펜티엄/셀러론, 라이젠 APU(G), 코어 울트라, EPYC Dense</b> 등은 자동 판정하지 않고 <b>확인불가</b>로 표시하니, 이 경우 AMD/인텔 공식 자료로 수동 확인해줘. 중요요약설명은 위치 기반 정렬·검증만 하며, <b>값 자체(코어수·TDP·출시일·메모리속도)는 입력값을 그대로 쓰고 지어내지 않아.</b>`;
-  const noteMON=`<b>모니터 규격 안내.</b> 표준 <code>모델명 크기 해상도 싱크 HDR [무결점]</code>. 크기·해상도는 검색 노출 핵심이라 상품명에 유지하고, <b>저주사율(≤75Hz)은 생략</b>·게이밍(≥100Hz)은 크기 뒤로 노출해. 브랜드(비트엠/Newsync)는 브랜드 필드, 무결점은 <code>[무결점]</code>로 맨 끝 고정. <b>HDR은 표기만 검사</b>하고 실제 VESA 인증 등급(예: HDR400 미달)은 이 도구가 판정하지 않으니 스펙 필드에서 별도 확인해줘. 이 규격은 <b>사무/일반 라인 기준(제안)</b>이며 확정 표준은 담당자 결정 사항이야.`;
-  html+=`<div class="note">${CATEGORY==='monitor'?noteMON:noteCPU}</div>`;
+  html+=`<div class="note"><b>판정 근거 안내.</b> 코드네임 사실검증은 인텔 코어 세대 규칙, 라이젠 시리즈 규칙, EPYC 끝자리 규칙에 기반한 <b>추론</b>이야. <b>펜티엄/셀러론, 라이젠 APU(G), 코어 울트라, EPYC Dense</b> 등은 자동 판정하지 않고 <b>확인불가</b>로 표시하니, 이 경우 AMD/인텔 공식 자료로 수동 확인해줘. 중요요약설명은 위치 기반 정렬·검증만 하며, <b>값 자체(코어수·TDP·출시일·메모리속도)는 입력값을 그대로 쓰고 지어내지 않아.</b></div>`;
 
   document.getElementById('out').innerHTML=html;
   document.getElementById('out').scrollIntoView({behavior:'smooth',block:'start'});
@@ -601,39 +541,14 @@ const PRESETS={
   'i5-6600':{maker:'인텔',brand:'코어i5-6세대',name:'6600 (스카이레이크) (벌크) (중고) (쿨러미포함) (A/S 1개)',sub:'',kw:'',spec:''},
   'i9-9900KF':{maker:'인텔',brand:'코어i9-9세대',name:'i9-9900KF (커피레이크-R) (정품) (쿨러미포함)',sub:'',kw:'',spec:''},
   '9800X3D':{maker:'AMD',brand:'라이젠7',name:'라이젠7 9800X3D (버미어) 정품',sub:'',kw:'',spec:''},
-  'EPYC9535':{maker:'AMD',brand:'EPYC™',name:'9535 (64C / 128T / 2.4GHz / 256MB)',sub:'※ 트레이(Tray) 상품 / 리드타임 : 영업일 3~7일',kw:'100-100000043WOF',
+  'EPYC9535':{maker:'AMD',brand:'EPYC™',name:'9535 (64C / 128T / 2.4GHz / 256MB)',sub:'',kw:'',
     spec:'AMD(소켓SP5/FC-LGA6096)|EPYC 9004 시리즈(Zen4/Genoa)|5nm|16코어|32스레드|기본 클럭:3.0GHz|최대 클럭:3.7GHz|All Core:3.6GHz|L2 캐시:16MB|L3 캐시:64MB|기본 TDP:200W|cTDP:200~240W|1P/2P 지원|PCIe5.0 x128|메모리 규격:DDR5|12채널|메모리 속도:최대 4800MT/s|메모리 대역폭:460.8GB/s(소켓당)|ECC 지원|내장그래픽:미탑재|기술 지원:SMT,AMD Infinity Guard,AMD Infinity Architecture|쿨러:미포함|출시일:2022-11-10'},
   'G4400':{maker:'인텔',brand:'펜티엄',name:'G4400 (스카이레이크)(중고)',sub:'',kw:'',spec:''},
   'Xeon8460':{maker:'인텔',brand:'제온',name:'8460Y+ (캐스케이드레이크) Tray',sub:'',kw:'인텔,제온,플래티넘,8460Y+,xeon,cpu,서버',spec:''},
   'Xeon6767P':{maker:'인텔',brand:'제온',name:'6767P (그래니트래피즈) Tray',sub:'',kw:'인텔,제온,6767P,xeon,cpu,서버',spec:''},
-  // ── 모니터 ──
-  'B225H':{cat:'monitor',maker:'비트엠',brand:'Newsync',name:'B225H 21.5 FHD 프리싱크 HDR [무결점]',sub:'',kw:'',spec:''},
-  'B225H_raw':{cat:'monitor',maker:'비트엠',brand:'Newsync',name:'Newsync B225H 21.5인치 풀HD FreeSync HDR 75Hz 무결점',sub:'',kw:'',spec:''},
-  'MON_game':{cat:'monitor',maker:'',brand:'',name:'M27Q 27 165Hz QHD 프리싱크 IPS HDR [무결점]',sub:'',kw:'',spec:''}
+  'MonSamsung':{maker:'삼성전자',brand:'',name:'LS24D304GAKXKR 평면모니터 S30GD 24인치 IPS패널 FHD 주사율100Hz (S24C314 후속모델)',sub:'',kw:'',spec:''},
+  'MonPhilips':{maker:'',brand:'',name:'24E1N1300 USB-C 4면 보더리스 100 높낮이 무결점',sub:'',kw:'',spec:''},
+  'MonOmen':{maker:'HP',brand:'',name:'OMEN 24 Gaming IPS FHD 165Hz 24인치 게이밍 모니터',sub:'',kw:'',spec:''}
 };
-function setCat(c){
-  CATEGORY=c;
-  const isMon=(c==='monitor');
-  document.getElementById('cat-cpu').classList.toggle('on',!isMon);
-  document.getElementById('cat-mon').classList.toggle('on',isMon);
-  document.getElementById('spec-cpu').classList.toggle('hidden',isMon);
-  document.getElementById('spec-mon').classList.toggle('hidden',!isMon);
-  document.getElementById('presets-cpu').classList.toggle('hidden',isMon);
-  document.getElementById('presets-mon').classList.toggle('hidden',!isMon);
-  document.getElementById('spec-field').classList.toggle('hidden',isMon); // EPYC 스펙칸은 CPU 전용
-  // 라벨/플레이스홀더 전환
-  document.getElementById('lb-maker').textContent = isMon ? '제조사 (브랜드)' : '제조사';
-  document.getElementById('lb-brand').textContent = isMon ? '제품라인' : '브랜드';
-  maker.placeholder = isMon ? '예: 비트엠' : '예: 인텔';
-  brand.placeholder = isMon ? '예: Newsync' : '예: 코어i5-6세대';
-  name.placeholder  = isMon ? '예: B225H 21.5 FHD 프리싱크 HDR [무결점]' : '예: 6600 (스카이레이크) (벌크) (중고)';
-  document.getElementById('out').innerHTML='';
-}
-function fill(k){
-  const p=PRESETS[k];
-  setCat(p.cat||'cpu');
-  maker.value=p.maker;brand.value=p.brand;name.value=p.name;sub.value=p.sub;kw.value=p.kw;
-  document.getElementById('spec').value=p.spec||'';
-  run();
-}
+function fill(k){const p=PRESETS[k];maker.value=p.maker;brand.value=p.brand;name.value=p.name;sub.value=p.sub;kw.value=p.kw;document.getElementById('spec').value=p.spec||'';run();}
 </script>
