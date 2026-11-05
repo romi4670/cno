@@ -672,11 +672,72 @@ function genSummary(ent, cooler){
 /* =========================================================
    7. CPU 검증 + 생성 (보존 모드)
    ========================================================= */
+/* =========================================================
+   서버 CPU 사양 DB (Xeon 6 · 공식 사양 페이지 개별 대조 완료 모델만)
+   - 형식은 등록본(6767P) 기준. 값은 Intel 공식 사양 페이지에서 확인 (2026-11-05)
+   - 시리즈 표기(6700P)는 등록본 형식에 따라 모델 번호 앞 두 자리로 만듦 (공식 페이지에는 시리즈명 표기 없음)
+   - 새 모델은 아래에 한 줄 추가. DB에 없는 서버 모델은 중요요약 값을 만들지 않음
+   ========================================================= */
+const XEON6_COMMON={cn:'그래니트 래피즈',socket:'LGA4710',proc:'Intel 3',scal:'2S',upi:'4링크(24GT/s)',mem:'DDR5-6400/MRDIMM-8800',ch:8,maxmem:'4TB',ecc:true,pcie:'5.0',lanes:88,amx:true,acc:'QAT·DLB·DSA·IAA',chk:'ark'};
+const SERVER_DB={
+  '6747P':{...XEON6_COMMON,cores:48,threads:96,base:2.7,allcore:3.8,max:3.9,l3:288,tdp:330,url:'https://www.intel.com/content/www/us/en/products/sku/241825/intel-xeon-6747p-processor-288m-cache-2-70-ghz/specifications.html'},
+  '6767P':{...XEON6_COMMON,cores:64,threads:128,base:2.4,allcore:3.6,max:3.9,l3:336,tdp:350,url:'https://www.intel.com/content/www/us/en/products/sku/241845/intel-xeon-6767p-processor-336m-cache-2-40-ghz/specifications.html'}
+};
+Object.keys(SERVER_DB).forEach(m=>{ SERVER_DB[m].model=m; SERVER_DB[m].series=m.slice(0,2)+'00P'; });
+function serverCooler(I){
+  if(I.cooler==='in') return {state:'in',text:'포함',why:'담당자 지정'};
+  if(I.cooler==='out') return {state:'out',text:'미포함',why:'담당자 지정'};
+  if(/트레이|tray/i.test(I.sub||'')) return {state:'out',text:'미포함',why:'부가제목에 트레이(Tray) 상품 표기'};
+  return {state:'unk',text:null,why:'부가제목에 트레이(Tray) 표기가 없어 쿨러 동봉 여부를 확정할 수 없음'};
+}
+function genServerSummary(e,cooler){
+  const f=n=>n.toFixed(1);
+  return [`Xeon 6 ${e.series} 시리즈(${e.cn})`,`소켓:${e.socket}`,`공정:${e.proc}`,`${e.cores}코어`,`${e.threads}스레드`,
+    `기본 클럭:${f(e.base)}GHz`,`올코어 터보:${f(e.allcore)}GHz`,`최대 클럭:${f(e.max)}GHz`,`L3 캐시:${e.l3}MB`,`기본 TDP:${e.tdp}W`,
+    `소켓 구성:최대 ${e.scal}`,`UPI:${e.upi}`,`메모리:${e.mem}`,`메모리 채널:${e.ch}채널`,`최대 메모리:${e.maxmem}`,
+    e.ecc?'ECC 지원':null,`PCIe ${e.pcie}`,`PCIe 레인:${e.lanes}`,e.amx?'AMX 지원':null,`가속기:${e.acc}`,
+    `쿨러:${cooler.state==='unk'?'[확인 필요]':cooler.text}`].filter(Boolean).join('|');
+}
+function diffSummary(cur,gen){
+  const a=cur.split('|').map(x=>x.trim()).filter(Boolean), b=gen.split('|');
+  const onlyCur=a.filter(x=>!b.includes(x)), onlyGen=b.filter(x=>!a.includes(x));
+  return {onlyCur,onlyGen,sameSet:!onlyCur.length&&!onlyGen.length,sameOrder:a.join('|')===gen};
+}
+
+/* 서버 CPU: 브랜드 · 키워드는 규칙으로, 중요요약은 서버 사양 DB 등록 모델만 */
+function serverBrandOf(model){
+  const m=(model||'').toUpperCase();
+  if(/^6\d{3}[PE]$/.test(m)) return 'Intel® Xeon® 6';
+  if(/^W\d?-\d{4}/.test(m)) return 'Intel® Xeon® W';
+  if(/^E-\d{4}/.test(m)) return 'Intel® Xeon® E';
+  return null; // Scalable(Gold·Platinum 등)은 세대별 등급 규칙이 달라 현재값 유지
+}
+function genServerKeywords(model, cn, oldKw){
+  const out=[], push=s=>{ if(s && !out.some(x=>x.toLowerCase()===s.toLowerCase())) out.push(s); };
+  const removed=[], foreign=[], cnConflict=[], M=model.toUpperCase();
+  const old=(oldKw||'').split(',').map(x=>x.trim()).filter(Boolean);
+  push(model);
+  old.forEach(k=>{
+    const kl=k.toLowerCase().replace(/\s/g,'');
+    if(BANNED.some(b=>kl===b.toLowerCase())){ removed.push(k); return; }
+    const c=canonCN(k);
+    if(CN_SET.has(c)){ if(cn && c!==cn){ cnConflict.push(k); return; } if(!cn) push(k); return; } // 코드네임은 아래에서 두 형태로 통일
+    const mm=k.toUpperCase().replace(/XEON/g,' ').match(/\b(\d{4,5}[A-Z]{0,3}|[WE]\d?-\d{4}[A-Z+]*)\b/);
+    if(mm && mm[1]!==M){ foreign.push(k); return; }
+    push(k);
+  });
+  if(/^6\d{3}[PE]$/.test(M)) push('Xeon'+model);   // 기존 등록 키워드 형태(예: Xeon6747P)
+  if(cn){ push(cn.replace(/\s/g,'')); if(/\s/.test(cn)) push(cn); } // 붙여 쓴 형태 + 띄어 쓴 형태
+  const added=out.filter(x=>!old.some(o=>o.toLowerCase()===x.toLowerCase()));
+  return {kw:out.join(','),removed,foreign,cnConflict,added};
+}
+
 function processCpu(I){
   const checks=[], P=parseCpuName(I.name);
   const ent=DB[P.model]||null;
+  const sent=SERVER_DB[P.model]||null;
   const isServer = P.isServerFmt || /XEON|제온/i.test(I.brand) || /^[WE]\d?-\d{4}/.test(P.model);
-  const inf=inferCodename(I.maker,I.brand,P.model);
+  const inf=inferCodename(I.maker,(isServer&&!/XEON|제온/i.test(I.brand))?(I.brand+' Xeon'):I.brand,P.model);
   const ask=(t,d)=>checks.push({sev:'ask',t,d});
 
   // (a) 제조사 ↔ 브랜드
@@ -709,10 +770,20 @@ function processCpu(I){
         if(!/\d\sGHz/i.test(specG.text)) ask('GHz 앞 공백 누락',`${C(specG.text)} → ${C(sm[4]+' GHz')}`);
         if(!/^\d+\.\d{2}$/.test(sm[4])) ask('클럭 소수점 2자리',`${C(sm[4])} → ${C(parseFloat(sm[4]).toFixed(2))}`);
         if(parseInt(sm[2])!==parseInt(sm[1])*2 && parseInt(sm[2])!==parseInt(sm[1])) checks.push({sev:'warn',t:'코어·스레드 비율 확인',d:`${C(sm[1]+'C / '+sm[2]+'T')} — 일반적 비율(1:1, 1:2)이 아님. 공식 사양 확인`});
-        checks.push({sev:'ok',t:'서버 Processor 형식 인정',d:'형식 유지 (값 검증은 서버 사양 DB 단계에서 확장 예정)'});
+        if(sent){
+          const bad=[];
+          if(parseInt(sm[1])!==sent.cores) bad.push(`코어 ${C(sm[1]+'C')} ↔ DB ${C(sent.cores+'C')}`);
+          if(parseInt(sm[2])!==sent.threads) bad.push(`스레드 ${C(sm[2]+'T')} ↔ DB ${C(sent.threads+'T')}`);
+          if(parseFloat(sm[3])!==sent.l3) bad.push(`캐시 ${C(sm[3]+'M')} ↔ DB ${C(sent.l3+'M')}`);
+          if(Math.abs(parseFloat(sm[4])-sent.base)>0.001) bad.push(`클럭 ${C(sm[4]+' GHz')} ↔ DB ${C(sent.base.toFixed(2)+' GHz')}`);
+          if(bad.length) checks.push({sev:'err',t:'상품명 사양 괄호 ↔ 공식 DB 불일치',d:bad.join('<br>')});
+          else checks.push({sev:'ok',t:'상품명 사양 괄호 ↔ 공식 DB 일치',d:`${C(specG.text)} — 코어·스레드·캐시·클럭`});
+        }
+        checks.push({sev:'ok',t:'서버 Processor 형식 인정',d:sent?'형식 유지':'형식 유지 (이 모델은 서버 사양 DB 미등록 — 값 검증 없음)'});
       }
     }
   }
+  if(P.isServerFmt && /^\d{5}$/.test(P.model)) ask('모델 번호 형식 확인',`${C(P.model)} — 인텔 서버 모델은 4자리 숫자 + 접미(P·E 등)입니다. 5자리면 글자 인식·입력 오류일 수 있음 (예: ${C(P.model.slice(0,4)+'P')}). 원본 확인 후 수정`);
   // (d) 판매구성 — 형식은 인정, 내용만 확인
   const saleG=P.groups.filter(g=>g.kind==='sale').map(g=>g.text).join(' / ');
   if(saleG) checks.push({sev:'ok',t:'판매구성 표기 인정',d:`${C(saleG)} — 상품명 유지 (보존 모드)`});
@@ -720,13 +791,13 @@ function processCpu(I){
   if(/Processor/i.test(P.outside) && /정품|벌크|tray|box/i.test(saleG)) checks.push({sev:'warn',t:'서버 Tray/Box 위치',d:'서버 CPU의 Tray/Box 정보는 부가제목에 두는 규칙'});
 
   // (e) 쿨러 판정 + 부가제목 충돌
-  const cooler=judgeCooler(saleG, ent, I.cooler);
+  const cooler=isServer?serverCooler(I):judgeCooler(saleG, ent, I.cooler);
   if(I.sub){
     const subIn=/쿨러\s*포함/.test(I.sub), subOut=/쿨러\s*미포함/.test(I.sub);
     if(cooler.state==='in'&&subOut) checks.push({sev:'err',t:'상품명↔부가제목 쿨러 충돌',d:`판매구성 ${C(saleG)} 에 쿨러가 있는데 부가제목은 ${C('쿨러 미포함')}`});
     if(cooler.state==='out'&&subIn) checks.push({sev:'err',t:'상품명↔부가제목 쿨러 충돌',d:`근거(${esc(cooler.why)})는 미포함인데 부가제목은 ${C('쿨러 포함')}`});
   }
-  if(cooler.state==='unk' && !isServer) checks.push({sev:'warn',t:'쿨러 동봉 여부 확인 필요',d:`${esc(cooler.why)}. 공급사 확인 후 '쿨러' 선택값으로 지정 — 근거 없이 포함으로 쓰지 않음`});
+  if(cooler.state==='unk' && (!isServer||sent)) checks.push({sev:'warn',t:'쿨러 동봉 여부 확인 필요',d:`${esc(cooler.why)}. 공급사 확인 후 '쿨러' 선택값으로 지정 — 근거 없이 포함으로 쓰지 않음`});
 
   // (f) DB 조회 + 현재 중요요약 대조
   if(ent){
@@ -741,11 +812,12 @@ function processCpu(I){
       if(other.length) checks.push({sev:'err',t:'중요요약에 다른 모델 혼입 의심',d:`${other.map(C).join(' ')}`});
     }
   }else{
-    checks.push({sev:'unk',t:'사양 DB 미등록 모델',d:`${C(P.rawModel||P.model)} — 중요요약 사양값을 생성하지 않음. Intel ARK 확인 후 DB 추가 필요`});
+    if(sent) checks.push({sev:'ok',t:'서버 사양 DB 등록 모델',d:`${C(sent.model)} — Intel 공식 사양 페이지 개별 대조 완료`});
+    else checks.push({sev:'unk',t:'사양 DB 미등록 모델',d:`${C(P.rawModel||P.model)} — 중요요약 사양값을 생성하지 않음. Intel ARK 확인 후 DB 추가 필요`});
   }
 
   // (g) 브랜드 대조
-  const brandNew = ent?brandOf(ent,P.model):(isServer?null:brandOf(null,((I.name+' '+I.brand).match(/i[3579]/i)||[''])[0]));
+  const brandNew = ent?brandOf(ent,P.model):(isServer?serverBrandOf(P.model):brandOf(null,((I.name+' '+I.brand).match(/i[3579]/i)||[''])[0]));
   if(brandNew && I.brand && I.brand.replace(/\s/g,'')!==brandNew.replace(/\s/g,'')) checks.push({sev:'warn',t:'브랜드 표기 변경 제안',d:`${C(I.brand)} → ${C(brandNew)}`});
 
   // ---- 생성 ----
@@ -767,8 +839,27 @@ function processCpu(I){
     if(kwInfo.removed.length) checks.push({sev:'warn',t:'키워드 제외 (포괄어·유통어)',d:kwInfo.removed.map(C).join(' ')});
     if(kwInfo.foreign.length) checks.push({sev:'err',t:'키워드에 다른 모델 혼입',d:kwInfo.foreign.map(C).join(' ')+' — 다른 상품 키워드 복사 의심'});
     if(kwInfo.typo.length) checks.push({sev:'warn',t:'키워드 오타 교정',d:kwInfo.typo.map(C).join(' ')});
+  }else if(isServer && /^(\d{4}[A-Z]{0,3}|[WE]\d?-\d{4}[A-Z+]*)$/i.test(P.model)){
+    kwInfo=genServerKeywords(P.model, inf&&inf.cn, I.kw);
+    gen.kw=kwInfo.kw;
+    if(kwInfo.removed.length) checks.push({sev:'warn',t:'키워드 제외 (포괄어·유통어)',d:kwInfo.removed.map(C).join(' ')});
+    if(kwInfo.foreign.length) checks.push({sev:I.ocr?'ask':'err',t:I.ocr?'키워드에 다른 모델 번호 · 인식 오류 확인':'키워드에 다른 모델 혼입',d:kwInfo.foreign.map(C).join(' ')+(I.ocr?' — 캡처의 작은 글씨는 잘못 읽힐 수 있음. 원본과 대조':' — 다른 상품 키워드 복사 의심')});
+    if(kwInfo.cnConflict.length) checks.push({sev:'ask',t:'키워드 코드네임 불일치',d:`${kwInfo.cnConflict.map(C).join(' ')} ↔ 판정 ${C(inf.cn)} — 제안 키워드에서 제외`});
+    if(kwInfo.added.length) checks.push({sev:'warn',t:'키워드 제안 · 추가 항목',d:`${kwInfo.added.map(C).join(' ')} — 모델명 우선, 코드네임은 붙여 쓴 형태와 띄어 쓴 형태 모두 포함. 사양 DB 없이 모델명·코드네임 규칙만 사용했으므로 확인 후 반영`});
   }
-  return {checks,gen,ent,cooler,category:'cpu',P,isServer,inf,saleG};
+  if(sent){
+    gen.sum=genServerSummary(sent,cooler);
+    if(I.spec && I.spec.includes('|')){
+      const df=diffSummary(I.spec,gen.sum);
+      if(df.sameSet && df.sameOrder) checks.push({sev:'ok',t:'중요요약 현재값 일치',d:'현재 등록값과 생성값이 글자 단위로 같음'});
+      else{
+        if(df.onlyCur.length) checks.push({sev:'warn',t:`중요요약 현재값에만 있는 항목 · ${df.onlyCur.length}건`,d:df.onlyCur.slice(0,8).map(C).join(' ')+(df.onlyCur.length>8?' …':'')});
+        if(df.onlyGen.length) checks.push({sev:'warn',t:`중요요약 생성값에만 있는 항목 · ${df.onlyGen.length}건`,d:df.onlyGen.slice(0,8).map(C).join(' ')+(df.onlyGen.length>8?' …':'')});
+        if(df.sameSet && !df.sameOrder) checks.push({sev:'warn',t:'중요요약 항목 순서 차이',d:'항목은 같고 순서만 다름'});
+      }
+    }
+  }
+  return {checks,gen,ent,sent,cooler,category:'cpu',P,isServer,inf,saleG};
 }
 
 /* =========================================================
@@ -910,12 +1001,14 @@ function fallbackCopy(t,ok){ const ta=document.createElement('textarea'); ta.val
 
 function run(){
   COPY={};
-  const I={maker:v('maker'),brand:v('brand'),name:v('name'),sub:v('sub'),kw:v('kw'),spec:v('spec'),as:v('as'),cooler:v('cooler')};
+  const I={maker:v('maker'),brand:v('brand'),name:v('name'),sub:v('sub'),kw:v('kw'),spec:v('spec'),as:v('as'),cooler:v('cooler'),ocr:OCR_NOTE};
   const G=$('gen'), K=$('checksBox'), M=$('mode'), S=$('src');
   if(!I.name){ G.innerHTML=`<div class="gen-row"><div class="gen-v na">캡처를 넣거나 상품명을 입력하면 상품명 · 브랜드 · 부가제목 · 키워드 · 중요요약설명이 여기에 채워집니다.</div></div>`; K.innerHTML=''; M.textContent=''; S.innerHTML=''; setRunState('idle','입력 대기'); return; }
   const cat=detectCategory(I);
   let g='', src='';
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
+  if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C('P')}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
+  if(OCR_NOTE && OCR_KWDROP) extra.push({sev:'warn',t:'인식된 키워드 일부 제외',d:`읽을 수 없는 글자가 섞인 항목 ${OCR_KWDROP}개를 비교에서 제외했습니다. 원본 키워드를 "기존 정보와 비교"에 직접 붙여넣으면 정확히 점검됩니다.`});
   if(cat==='monitor'){
     const mpre=I.spec?normalizeMonSummary(I.spec,I.name):null;
     const r=processMonitor(I, mpre&&mpre.fields);
@@ -943,15 +1036,22 @@ function run(){
         if(sugg.replace(/\s/g,'')!==I.name.replace(/\s/g,'')){ nameOut=sugg; tag=['ask','참고안 · 담당 승인 후 수정']; } }
     }else if(r.checks.some(c=>c.sev==='ask')) tag=['ask','확인 요청 있음'];
     g+=genRow('name','상품명',nameOut,'',tag);
-    g+=genRow('brand','브랜드',r.gen.brand,r.isServer?'서버 CPU 브랜드는 현재값 유지 (Intel® Xeon® Gold / Xeon® 6 / Xeon® W / Xeon® E 등)':'티어 판별 불가 — 모델명 확인',r.gen.brand?['ok','규칙']:['unk','현재값 유지']);
+    g+=genRow('brand','브랜드',r.gen.brand,r.isServer?'서버 CPU 브랜드는 현재값 유지 (Intel® Xeon® Gold / Xeon® 6 / Xeon® W / Xeon® E 등)':'티어 판별 불가 — 모델명 확인',r.gen.brand?(r.isServer?['ask','규칙 기반 · 확인 요청']:['ok','규칙']):['unk','현재값 유지']);
     g+=genRow('sub','부가제목',r.gen.sub,'서버 CPU 부가제목은 공급 조건(Tray·리드타임·취소 규정)이라 현재값 유지',r.gen.sub?(/확인\]/.test(r.gen.sub)?['ask','쿨러 확인 필요']:['ok','규칙']):['unk','현재값 유지']);
-    g+=genRow('kw','키워드',r.gen.kw,'사양 DB 미등록 모델 — 키워드를 추정 생성하지 않음',r.gen.kw?['ok','규칙']:['unk','DB 미등록']);
-    g+=genRow('sum','중요요약설명',r.gen.sum,'사양 DB 미등록 모델 — 사양값을 만들지 않음 (Truth Protocol). Intel 공식 사양 확인 후 DB에 추가하면 생성됩니다.',r.ent?(r.ent.chk==='ark'?['ok','Intel 공식 사양 대조 완료']:['ask','공식 대조 전 · 등록 전 확인']):['unk','DB 미등록']);
+    g+=genRow('kw','키워드',r.gen.kw,'사양 DB 미등록 모델 — 키워드를 추정 생성하지 않음',r.gen.kw?(r.isServer?['ask','규칙 기반 · 확인 요청']:['ok','규칙']):['unk','DB 미등록']);
+    g+=genRow('sum','중요요약설명',r.gen.sum,'사양 DB 미등록 모델 — 사양값을 만들지 않음 (Truth Protocol). Intel 공식 사양 확인 후 DB에 추가하면 생성됩니다.',r.ent?(r.ent.chk==='ark'?['ok','Intel 공식 사양 대조 완료']:['ask','공식 대조 전 · 등록 전 확인']):(r.sent?(/\[확인 필요\]/.test(r.gen.sum)?['ask','쿨러 확인 필요']:['ok','Intel 공식 사양 대조 완료']):['unk','DB 미등록']));
     if(r.ent){
       const e=r.ent, gg=GEN[e.gen];
       src+=`<div class="src">사양 출처: Intel 공식 사양 · <b>${e.chk==='ark'?'이 모델의 공식 사양 페이지와 개별 대조 완료':'공식 페이지 개별 대조 전 (기본 모델 값에서 파생) — 등록 전 확인 권장'}</b> · <a href="${arkURL(e.model)}" target="_blank" rel="noopener">Intel에서 ${esc(e.disp)} 확인 ↗</a></div>`;
       src+=`<details><summary>DB 원본 값 보기</summary><table class="tbl">`+
         [['모델',e.disp],['세대/코드네임',`${gg.label} / ${gg.cn}`],['코어',e.e?`${e.p+e.e} (P${e.p}+E${e.e})`:e.p],['스레드',e.t],['클럭',`P ${e.pb}~${e.pt}${e.eb?` / E ${e.eb}~${e.et}`:''} / 최대 ${e.max} GHz`],['캐시',`L2 ${e.l2}MB / L3 ${e.l3}MB`],['전력',`${e.bp}W / ${e.mtp}W`],['메모리',`${e.mem} · 최대 ${gg.maxmem}GB`],['내장그래픽',e.gpu?`${e.gpu} (최대 ${e.gf}GHz)`:'미탑재']]
+        .map(([a,b])=>`<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')+`</table></details>`;
+    }
+    if(r.sent){
+      const e=r.sent;
+      src+=`<div class="src">사양 출처: Intel 공식 사양 · <b>이 모델의 공식 사양 페이지와 개별 대조 완료</b> · <a href="${e.url}" target="_blank" rel="noopener">Intel에서 ${esc(e.model)} 확인 ↗</a><br>시리즈 표기(${esc(e.series)} 시리즈)는 등록본 형식에 따라 모델 번호 앞 두 자리로 만들었습니다(공식 페이지에는 시리즈명 표기 없음).</div>`;
+      src+=`<details><summary>DB 원본 값 보기</summary><table class="tbl">`+
+        [['모델',e.model],['코드네임',e.cn],['소켓/공정',`${e.socket} / ${e.proc}`],['코어/스레드',`${e.cores} / ${e.threads}`],['클럭',`기본 ${e.base} / 올코어 터보 ${e.allcore} / 최대 ${e.max} GHz`],['캐시/TDP',`L3 ${e.l3}MB / ${e.tdp}W`],['소켓 구성/UPI',`최대 ${e.scal} / ${e.upi}`],['메모리',`${e.mem} · ${e.ch}채널 · 최대 ${e.maxmem}`],['PCIe',`${e.pcie} · ${e.lanes}레인`],['가속기',e.acc]]
         .map(([a,b])=>`<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')+`</table></details>`;
     }
     K.innerHTML=renderChecks([...extra,...r.checks]);
@@ -965,8 +1065,8 @@ function run(){
   else setRunState('done','결과 완료');
 }
 function setRunState(kind,text){ const el=$('runState'); if(!el) return; el.className='state st-'+kind; el.textContent=text; }
-let T_RUN=null, OCR_NOTE=false;
-$('name').addEventListener('input',()=>{ OCR_NOTE=false; clearTimeout(T_RUN); T_RUN=setTimeout(run,350); });
+let T_RUN=null, OCR_NOTE=false, OCR_FIX=null, OCR_KWDROP=0;
+$('name').addEventListener('input',()=>{ OCR_NOTE=false; OCR_FIX=null; OCR_KWDROP=0; clearTimeout(T_RUN); T_RUN=setTimeout(run,350); });
 ['maker','brand','sub','kw','spec'].forEach(id=>$(id).addEventListener('input',()=>{ clearTimeout(T_RUN); T_RUN=setTimeout(run,350); }));
 ['as','cooler'].forEach(id=>$(id).addEventListener('change',run));
 
@@ -1015,6 +1115,10 @@ function parseShotText(text){
   if(!out.name){ const c=lines.find(l=>/\b\d{4,5}[A-Z]{0,2}\b|Processor/.test(l)); if(c) out.name=c; }
   // OCR 교정: 문자 혼동이 확정적인 경우만
   out.name=out.name.replace(/×/g,'X');
+  // 서버 모델 보정: 인텔 서버 모델은 4자리+접미(P·E)이므로, 'Processor' 앞 5자리(끝 0)는 P가 0으로 읽힌 경우로 보고 보정 → 화면에 확인 요청으로 표시
+  out.fix=null;
+  const fx=out.name.match(/^(\d{4})[0O](\s+Processor\b)/i);
+  if(fx){ out.fix={from:fx[1]+'0',to:fx[1]+'P'}; out.name=out.name.replace(/^\d{4}[0O]/,fx[1]+'P'); }
   // 서버 형식 (xC, yT, zM Cache, a.bc GHz): C·T 오인식은 '스레드 = 코어×1 또는 ×2' 정합성이 맞을 때만 교정
   out.name=out.name.replace(/\((\s*\d+[C6G0O]?)\s*,\s*(\d+[T1lI|7]?)\s*,(\s*[\d.]+M Cache)/i,(m0,a,b,rest)=>{
     const ca=a.trim(), tb=b.trim();
@@ -1025,6 +1129,8 @@ function parseShotText(text){
   out.name=out.name
     .replace(/(\d)\s*GHz/,'$1 GHz').replace(/\s*\/\s*쿨러\s*미포함\s*$/,'').replace(/\(\s*([^()]*?)\s*$/,'($1)').trim();
   if(/\(/.test(out.name) && (out.name.match(/\(/g)||[]).length>(out.name.match(/\)/g)||[]).length) out.name+=')';
+  // 작은 글씨 키워드 줄은 오인식이 많아, 이상한 글자가 섞인 항목은 비교에서 제외
+  if(out.kw){ const t=out.kw.split(',').map(x=>x.trim()).filter(Boolean), g=t.filter(x=>/^[가-힣A-Za-z0-9 .+\-®™]+$/.test(x)); out.kwDropped=t.length-g.length; out.kw=g.join(','); }
   return out;
 }
 async function handleImage(file){
@@ -1041,7 +1147,7 @@ async function handleImage(file){
     const f=parseShotText(data.text);
     if(!f.name){ throw new Error('상품명을 찾지 못했습니다. 상품명이 보이도록 다시 캡처하거나 직접 입력해 주세요.'); }
     $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value='';
-    OCR_NOTE=true;
+    OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0;
     st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (신뢰도 ${Math.round(data.confidence)}%) — 상품명 칸을 원본과 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`;
     dz.innerHTML=`<div class="drop-t">다른 캡처를 끌어다 놓거나 <b>Ctrl+V</b></div><img src="${url}" alt="입력 캡처"><input type="file" id="file" accept="image/*" hidden>`;
     bindFile(); run();
@@ -1089,7 +1195,7 @@ function presetBtn(p,i){ const [t]=p; const parts=t.split(' · '); const kind=pa
   return `<button type="button" class="btn btn-ghost" onclick="fill(${i})"><span class="k ${k[0]}">${k[1]}</span>${esc(text)}</button>`; }
 $('presets').innerHTML=FEATURED.map(i=>presetBtn(PRESETS[i],i)).join('');
 $('presetsMore').innerHTML=PRESETS.map((p,i)=>FEATURED.includes(i)?'':presetBtn(p,i)).join('');
-function fill(i){ const p=PRESETS[i][1]; ['maker','brand','name','sub','kw','spec'].forEach(k=>$(k).value=p[k]||''); $('as').value=''; $('cooler').value=''; OCR_NOTE=false; $('more').open=!!(p.sub||p.kw||p.spec); run(); $('gen').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function fill(i){ const p=PRESETS[i][1]; ['maker','brand','name','sub','kw','spec'].forEach(k=>$(k).value=p[k]||''); $('as').value=''; $('cooler').value=''; OCR_NOTE=false; OCR_FIX=null; OCR_KWDROP=0; $('more').open=!!(p.sub||p.kw||p.spec); run(); $('gen').scrollIntoView({behavior:'smooth',block:'nearest'}); }
 </script>
 </body>
 </html>
