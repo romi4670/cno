@@ -281,6 +281,9 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
 .legend{color:#38435A}
 .foot{color:#38435A}
 
+/* 캡처 영역 보조: 파일에서 선택 */
+.pick{font-size:12.5px;color:var(--ink-2);margin-top:8px}
+.linkbtn{font:inherit;font-weight:600;background:none;border:0;padding:2px 0;color:var(--blue-ink);text-decoration:underline;cursor:pointer}
 /* 범례: 버튼처럼 보이지 않도록 정렬된 목록으로 */
 .legend{display:grid;grid-template-columns:1fr;gap:6px;margin-top:16px;padding-top:14px;border-top:1px solid #D5DDE8}
 .legend span{display:flex;align-items:center;gap:10px}
@@ -311,11 +314,12 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
       <div class="in-grid">
         <div class="way">
           <div class="way-lab"><span class="n">방법 1</span>캡처 넣기 <span class="h">신관리자·상품 목록 화면</span></div>
-          <div id="drop" class="drop" tabindex="0" role="button" aria-label="캡처 이미지 넣기: 끌어다 놓거나, 선택 후 Ctrl+V">
-            <div class="drop-t">캡처를 끌어다 놓거나 클릭 후 <b>Ctrl+V</b></div>
+          <div id="drop" class="drop" tabindex="0" role="group" aria-label="캡처 이미지 붙여넣기 영역: 끌어다 놓거나 Ctrl+V">
+            <div class="drop-t">캡처를 끌어다 놓거나 <b>Ctrl+V</b>로 붙여넣기</div>
             <div class="drop-s">상품명이 보이게 캡처하면 모델 번호를 읽어 나머지 필드를 채웁니다</div>
             <input type="file" id="file" accept="image/*" hidden>
           </div>
+          <div class="pick">저장해 둔 이미지 파일이면 <button type="button" id="pick" class="linkbtn">파일에서 선택</button></div>
           <div id="ocrStatus" class="ocr-st" role="status" aria-live="polite"></div>
         </div>
         <div class="way">
@@ -1049,12 +1053,12 @@ async function handleImage(file){
 function bindFile(){ const fi=$('file'); if(fi) fi.onchange=()=>{ if(fi.files[0]) handleImage(fi.files[0]); }; }
 (function initDrop(){
   const dz=$('drop'); bindFile();
-  dz.addEventListener('click',()=>{ const fi=$('file'); if(fi) fi.click(); });
-  dz.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); const fi=$('file'); if(fi) fi.click(); } });
+  dz.addEventListener('click',()=>dz.focus());   // 클릭해도 파일 창을 열지 않음 (붙여넣기는 화면 어디서나 가능)
+  $('pick').addEventListener('click',()=>{ const fi=$('file'); if(fi) fi.click(); });
   dz.addEventListener('dragover',e=>{ e.preventDefault(); dz.classList.add('over'); });
   dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
   dz.addEventListener('drop',e=>{ e.preventDefault(); dz.classList.remove('over'); const f=[...e.dataTransfer.files].find(x=>/^image\//.test(x.type)); if(f) handleImage(f); });
-  document.addEventListener('paste',e=>{ const it=[...(e.clipboardData||{}).items||[]].find(x=>/^image\//.test(x.type)); if(it){ e.preventDefault(); handleImage(it.getAsFile()); } });
+  document.addEventListener('paste',e=>{ const cd=e.clipboardData||{}; const it=[...(cd.items||[])].find(x=>/^image\//.test(x.type)); const fl=[...(cd.files||[])].find(x=>/^image\//.test(x.type)); const f=it?it.getAsFile():fl; if(f){ e.preventDefault(); handleImage(f); } });
 })();
 
 /* =========================================================
