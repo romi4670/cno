@@ -16,10 +16,10 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#F4F5F7; --panel:#FFFFFF; --sunken:#F7F8FA;
+    --bg:#E6EBF2; --panel:#FFFFFF; --sunken:#F6F8FB; --head:#F2F6FC;
     --ink:#1F2328; --ink-2:#4B5563; --ink-3:#6B7280;
-    --line:#E3E6EA; --line-2:#D1D5DB;
-    --blue:#1F5FD1; --blue-ink:#1A4FB0; --blue-bg:#EEF3FC; --blue-line:#B9CDF2;
+    --line:#DDE3EB; --line-2:#D3DAE4;
+    --blue:#0C58FB; --blue-ink:#0A47CC; --blue-bg:#EDF3FF; --blue-line:#B3CBFD;
     --err:#B42318; --err-bg:#FEF1EF;
     --ask:#6D3FB8; --ask-bg:#F3EEFC;
     --warn:#8A5A00; --warn-bg:#FDF5E3;
@@ -40,26 +40,26 @@
 
   /* ---------- 헤더 ---------- */
   .hd{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;
-    padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid var(--line-2)}
+    padding-bottom:22px;margin-bottom:24px;border-bottom:1px solid #C9D2DE}
   .brand{display:flex;align-items:center;gap:18px;min-width:0}
   .wm{font-family:var(--sans);font-weight:800;font-size:46px;line-height:1;letter-spacing:-.045em;color:var(--ink);
     display:inline-flex;align-items:baseline;padding-right:18px;border-right:1px solid var(--line-2)}
-  .wm .o{color:var(--blue)}
+  .wm .c{color:var(--blue)}
   .wm .dot{width:8px;height:8px;background:var(--blue);border-radius:1px;margin-left:3px;display:inline-block}
   .brand-t{min-width:0}
   .brand-k{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
   .brand-l{font-size:15px;color:var(--ink-2);margin-top:3px}
-  .meta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:12.5px;color:var(--ink-3)}
+  .meta{display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-size:12.5px;color:var(--ink-2)}
   .meta .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-  .chip{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1px solid var(--line-2);border-radius:999px;background:var(--panel);font-size:12px;color:var(--ink-2);white-space:nowrap}
+  .chip{display:inline-flex;align-items:center;height:24px;padding:0 9px;border:1px solid #C9D2DE;border-radius:999px;background:var(--panel);font-size:12px;color:var(--ink-2);white-space:nowrap}
   .chip.v{font-family:var(--mono);font-size:11.5px}
-  .credit{color:var(--ink-3)}
+  .credit{color:var(--ink-2)}
   @media(max-width:760px){.meta{align-items:flex-start}.meta .chips{justify-content:flex-start}.wm{font-size:38px}}
   @media(max-width:420px){.brand{flex-direction:column;align-items:flex-start;gap:10px}.wm{border-right:none;padding-right:0}}
 
   /* ---------- 카드 공통 ---------- */
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 1px 2px rgba(16,24,40,.04)}
-  .card-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+  .card{background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);box-shadow:0 1px 3px rgba(16,24,40,.06);overflow:hidden}
+  .card-hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line-2);background:var(--head)}
   .card-t{font-size:16px;font-weight:700;margin:0;letter-spacing:-.01em}
   .card-d{font-size:13px;color:var(--ink-3);margin-top:2px}
   .card-b{padding:20px}
@@ -76,7 +76,7 @@
   .drop{flex:1;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
     border:1.5px dashed var(--blue-line);border-radius:var(--r);background:var(--blue-bg);padding:20px 16px;text-align:center;cursor:pointer;
     transition:background .15s,border-color .15s}
-  .drop:hover,.drop.over{background:#E3EBFA;border-color:var(--blue)}
+  .drop:hover,.drop.over{background:#E1EBFF;border-color:var(--blue)}
   .drop:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
   .drop-t{font-size:15px;font-weight:600;color:var(--ink)}
   .drop-t b{font-family:var(--mono);font-weight:600;font-size:13px;background:#fff;border:1px solid var(--blue-line);border-radius:4px;padding:1px 6px}
@@ -94,7 +94,7 @@
     border:1px solid var(--line-2);border-radius:var(--r-s);padding:10px 12px;line-height:1.45;transition:border-color .15s,box-shadow .15s}
   input::placeholder,textarea::placeholder{color:#9AA1AB}
   input:hover,textarea:hover,select:hover{border-color:#B6BCC5}
-  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,95,209,.18)}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(12,88,251,.18)}
   #name{font-size:17px;padding:13px 14px;font-weight:500}
   textarea{min-height:64px;resize:vertical}
   select{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:pointer;
@@ -144,7 +144,7 @@
   .gen-tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:600;font-family:var(--sans);margin:0}
   .t-ok{background:var(--ok-bg);color:var(--ok)} .t-ask{background:var(--ask-bg);color:var(--ask)} .t-unk{background:var(--unk-bg);color:var(--unk)}
   .cp{font-family:var(--sans);font-size:13px;font-weight:600;height:32px;padding:0 14px;border-radius:var(--r-s);border:1px solid var(--blue);background:#fff;color:var(--blue-ink);cursor:pointer;transition:background .15s,color .15s}
-  .cp:hover{background:var(--blue);color:#fff}
+  .cp:hover{background:var(--blue-ink);border-color:var(--blue-ink);color:#fff}
   .cp.done{background:var(--ok);border-color:var(--ok);color:#fff}
   .src{font-size:13px;color:var(--ink-2);margin-top:14px;padding:10px 12px;background:var(--sunken);border-radius:var(--r-s);border:1px solid var(--line)}
   .src a{color:var(--blue-ink);font-weight:600}
@@ -160,7 +160,7 @@
   .mode{font-size:12.5px;color:var(--ink-3);margin-bottom:12px}
   .mode:empty{display:none}
   .checks{border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
-  .checks > .card-h{font-size:12.5px;font-weight:600;color:var(--ink-2);padding:9px 14px;background:var(--sunken);border-bottom:1px solid var(--line)}
+  .checks > .card-h{font-size:12.5px;font-weight:600;color:var(--ink-2);padding:9px 14px;background:var(--head);border-bottom:1px solid var(--line)}
   .chk{display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:flex-start}
   .chk:last-child{border-bottom:none}
   .badge{flex:0 0 auto;font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:4px;margin-top:1px;min-width:70px;text-align:center;line-height:1.4}
@@ -190,7 +190,7 @@
   .btn-ghost:hover{border-color:var(--blue);background:var(--blue-bg)}
   .btn-ghost .k{font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;flex:0 0 auto}
   .k-ok{background:var(--ok-bg);color:var(--ok)} .k-err{background:var(--err-bg);color:var(--err)} .k-unk{background:var(--unk-bg);color:var(--unk)} .k-mon{background:var(--blue-bg);color:var(--blue-ink)}
-  .foot{margin-top:28px;font-size:12.5px;color:var(--ink-3);text-align:center}
+  .foot{margin-top:28px;font-size:12.5px;color:var(--ink-2);text-align:center}
   @media(prefers-reduced-motion:no-preference){
     #gen > .gen-row,#checksBox .chk{animation:rise .22s ease both}
     @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -200,7 +200,7 @@
 <div class="wrap">
   <header class="hd">
     <div class="brand">
-      <span class="wm" aria-label="CNO">CN<span class="o">O</span><span class="dot" aria-hidden="true"></span></span>
+      <span class="wm" aria-label="CNO"><span class="c">C</span>NO<span class="dot" aria-hidden="true"></span></span>
       <div class="brand-t">
         <div class="brand-k">상품 등록 표준화 Agent</div>
         <div class="brand-l">상품명 하나로, 등록 정보와 검증 근거를 한 번에.</div>
