@@ -123,9 +123,9 @@
         <div class="field"><label>키워드 (현재값)</label><textarea id="kw" placeholder="쉼표 구분"></textarea></div>
         <div class="row2">
           <div class="field"><label>A/S 기간 (확인된 경우만)</label>
-            <select id="as"><option value="">미확인 → 부가제목에서 생략</option><option>1년</option><option>2년</option><option>3년</option><option>5년</option></select></div>
+            <select id="as"><option value="">미확인 (생략)</option><option>1년</option><option>2년</option><option>3년</option><option>5년</option></select></div>
           <div class="field"><label>쿨러 (자동 판정 덮어쓰기)</label>
-            <select id="cooler"><option value="">자동 (상품명 판매구성 기준)</option><option value="in">포함</option><option value="out">미포함</option></select></div>
+            <select id="cooler"><option value="">자동 판정</option><option value="in">포함</option><option value="out">미포함</option></select></div>
         </div>
         <div class="field"><label>중요요약설명 (현재값, 선택 · CPU 사양 대조 / 모니터 정렬)</label><textarea id="spec" placeholder="파이프 | 구분"></textarea></div>
         <button class="btn btn-run" onclick="run()">검증 + 생성</button>
