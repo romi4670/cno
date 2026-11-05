@@ -678,12 +678,29 @@ function genSummary(ent, cooler){
    - 시리즈 표기(6700P)는 등록본 형식에 따라 모델 번호 앞 두 자리로 만듦 (공식 페이지에는 시리즈명 표기 없음)
    - 새 모델은 아래에 한 줄 추가. DB에 없는 서버 모델은 중요요약 값을 만들지 않음
    ========================================================= */
-const XEON6_COMMON={cn:'그래니트 래피즈',socket:'LGA4710',proc:'Intel 3',scal:'2S',upi:'4링크(24GT/s)',mem:'DDR5-6400/MRDIMM-8800',ch:8,maxmem:'4TB',ecc:true,pcie:'5.0',lanes:88,amx:true,acc:'QAT·DLB·DSA·IAA',chk:'ark'};
+const XEON6_COMMON={cn:'그래니트 래피즈',cnEn:'Granite Rapids',socket:'LGA4710',proc:'Intel 3',scal:'2S',upi:'4링크(24GT/s)',mem:'DDR5-6400/MRDIMM-8800',ch:8,maxmem:'4TB',ecc:true,pcie:'5.0',lanes:88,amx:true,acc:'QAT·DLB·DSA·IAA',chk:'ark'};
 const SERVER_DB={
   '6747P':{...XEON6_COMMON,cores:48,threads:96,base:2.7,allcore:3.8,max:3.9,l3:288,tdp:330,url:'https://www.intel.com/content/www/us/en/products/sku/241825/intel-xeon-6747p-processor-288m-cache-2-70-ghz/specifications.html'},
-  '6767P':{...XEON6_COMMON,cores:64,threads:128,base:2.4,allcore:3.6,max:3.9,l3:336,tdp:350,url:'https://www.intel.com/content/www/us/en/products/sku/241845/intel-xeon-6767p-processor-336m-cache-2-40-ghz/specifications.html'}
+  '6767P':{...XEON6_COMMON,cores:64,threads:128,base:2.4,allcore:3.6,max:3.9,l3:336,tdp:350,pk:'PK8072006269900',url:'https://www.intel.com/content/www/us/en/products/sku/241845/intel-xeon-6767p-processor-336m-cache-2-40-ghz/specifications.html'}
 };
 Object.keys(SERVER_DB).forEach(m=>{ SERVER_DB[m].model=m; SERVER_DB[m].series=m.slice(0,2)+'00P'; });
+/* 서버 키워드 규칙 (담당자 확정, 순서 고정):
+   모델명, Xeon 모델명, Xeon모델명, 인텔 오더코드(PK…), 영문 코드네임, 한글 코드네임(붙임), N코어, 서버CPU, 인텔, 제온, 제온6, 소켓 */
+function genXeonKeywords(e, oldKw){
+  const old=(oldKw||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const pkOld=old.find(k=>/^PK\d{8,}$/i.test(k));
+  const pk=e.pk||(pkOld?pkOld.toUpperCase():null);
+  const out=[e.model,'Xeon '+e.model,'Xeon'+e.model,pk,e.cnEn,e.cn.replace(/\s/g,''),e.cores+'코어','서버CPU','인텔','제온','제온6',e.socket].filter(Boolean);
+  const low=out.map(x=>x.toLowerCase().replace(/\s/g,''));
+  const foreign=[], extra=[];
+  old.forEach(k=>{
+    const kl=k.toLowerCase().replace(/\s/g,'');
+    if(low.includes(kl)) return;
+    const mm=k.toUpperCase().replace(/XEON|제온/g,' ').match(/\b(\d{4,5}[A-Z]{0,3}|[WE]\d?-\d{4}[A-Z+]*)\b/);
+    if(mm && mm[1]!==e.model.toUpperCase()) foreign.push(k); else extra.push(k);
+  });
+  return {kw:out.join(','),foreign,extra,pkMissing:!pk,added:out.filter(x=>!old.some(o=>o.toLowerCase()===x.toLowerCase()))};
+}
 function serverCooler(I){
   if(I.cooler==='in') return {state:'in',text:'포함',why:'담당자 지정'};
   if(I.cooler==='out') return {state:'out',text:'미포함',why:'담당자 지정'};
@@ -839,6 +856,14 @@ function processCpu(I){
     if(kwInfo.removed.length) checks.push({sev:'warn',t:'키워드 제외 (포괄어·유통어)',d:kwInfo.removed.map(C).join(' ')});
     if(kwInfo.foreign.length) checks.push({sev:'err',t:'키워드에 다른 모델 혼입',d:kwInfo.foreign.map(C).join(' ')+' — 다른 상품 키워드 복사 의심'});
     if(kwInfo.typo.length) checks.push({sev:'warn',t:'키워드 오타 교정',d:kwInfo.typo.map(C).join(' ')});
+  }else if(sent){
+    const xk=genXeonKeywords(sent,I.kw);
+    gen.kw=xk.kw;
+    if(xk.foreign.length) checks.push({sev:I.ocr?'ask':'err',t:I.ocr?'키워드에 다른 모델 번호 · 인식 오류 확인':'키워드에 다른 모델 혼입',d:xk.foreign.map(C).join(' ')+(I.ocr?' — 캡처의 작은 글씨는 잘못 읽힐 수 있음. 원본과 대조':' — 다른 상품 키워드 복사 의심')});
+    if(xk.extra.length) checks.push({sev:'warn',t:'키워드 규칙 외 기존 항목 · 제안에서 제외',d:xk.extra.map(C).join(' ')+' — 필요하면 직접 추가'});
+    if(xk.pkMissing) checks.push({sev:'ask',t:'인텔 오더코드(PK…) 확인 필요',d:'키워드 규칙의 4번째 항목(PK로 시작하는 인텔 오더코드)은 이 모델 값을 알 수 없어 비워 두었습니다. 등록 상품·공급사 자료에서 확인해 모델명 뒤에 직접 추가'});
+    else if(!I.kw||!/^PK\d{8,}$/i.test((I.kw.split(',').find(k=>/^PK\d{8,}$/i.test(k.trim()))||'').trim())) checks.push({sev:'ask',t:'인텔 오더코드(PK…) 확인',d:`${C(sent.pk)} — 담당자 등록값을 그대로 사용했고 Intel 공식 페이지와는 대조하지 못함. 트레이/박스 구분에 따라 코드가 다를 수 있음`});
+    if(xk.added.length) checks.push({sev:'warn',t:'키워드 제안 · 추가 항목',d:`${xk.added.map(C).join(' ')} — 담당자 키워드 규칙(모델명→Xeon 모델→오더코드→영문·한글 코드네임→코어→서버CPU·인텔·제온·제온6→소켓) 순서`});
   }else if(isServer && /^(\d{4}[A-Z]{0,3}|[WE]\d?-\d{4}[A-Z+]*)$/i.test(P.model)){
     kwInfo=genServerKeywords(P.model, inf&&inf.cn, I.kw);
     gen.kw=kwInfo.kw;
@@ -1007,7 +1032,7 @@ function run(){
   const cat=detectCategory(I);
   let g='', src='';
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
-  if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C('P')}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
+  if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
   if(OCR_NOTE && OCR_KWDROP) extra.push({sev:'warn',t:'인식된 키워드 일부 제외',d:`읽을 수 없는 글자가 섞인 항목 ${OCR_KWDROP}개를 비교에서 제외했습니다. 원본 키워드를 "기존 정보와 비교"에 직접 붙여넣으면 정확히 점검됩니다.`});
   if(cat==='monitor'){
     const mpre=I.spec?normalizeMonSummary(I.spec,I.name):null;
@@ -1115,8 +1140,14 @@ function parseShotText(text){
   if(!out.name){ const c=lines.find(l=>/\b\d{4,5}[A-Z]{0,2}\b|Processor/.test(l)); if(c) out.name=c; }
   // OCR 교정: 문자 혼동이 확정적인 경우만
   out.name=out.name.replace(/×/g,'X');
+  // 목록 화면 세로선·괄호 등 앞쪽 잡글자 제거 (모델 번호 앞)
+  out.name=out.name.replace(/^[\s|!\[\]{}lI]+(?=\d{3,5}[A-Za-z]?\s)/,'').trim();
+  // 서버 형식은 '… GHz)'에서 끝남: 뒤에 붙은 잡글자(예: 선택 영역 가장자리의 '[HI') 제거
+  out.name=out.name.replace(/^(\d{4}[0OPEpe]?\s+Processor\s*\([^)]*?GHz\s*\)).+$/i,'$1');
   // 서버 모델 보정: 인텔 서버 모델은 4자리+접미(P·E)이므로, 'Processor' 앞 5자리(끝 0)는 P가 0으로 읽힌 경우로 보고 보정 → 화면에 확인 요청으로 표시
   out.fix=null;
+  const fp=out.name.match(/^(\d{4})([pe])(\s+Processor\b)/);
+  if(fp){ out.fix={from:fp[1]+fp[2],to:fp[1]+fp[2].toUpperCase()}; out.name=out.name.replace(/^\d{4}[pe]/,fp[1]+fp[2].toUpperCase()); }
   const fx=out.name.match(/^(\d{4})[0O](\s+Processor\b)/i);
   if(fx){ out.fix={from:fx[1]+'0',to:fx[1]+'P'}; out.name=out.name.replace(/^\d{4}[0O]/,fx[1]+'P'); }
   // 서버 형식 (xC, yT, zM Cache, a.bc GHz): C·T 오인식은 '스레드 = 코어×1 또는 ×2' 정합성이 맞을 때만 교정
