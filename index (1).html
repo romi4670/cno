@@ -1,0 +1,729 @@
+<!--
+  CNO — Chief Naming Officer v2 (상품 등록 표준화 Agent: CPU · 모니터)
+  Romi Lab · author: Rom Kim (romi4670)
+  - 1단계 상품명 검증: CPU는 '보존 모드'(형식은 존중, 사실 오류만 확인 요청) / 모니터는 표준 상품명 제안
+  - 2단계 필드 생성: 브랜드 · 부가제목 · 키워드 · 중요요약설명 (CPU 사양 DB 기반)
+  - Truth Protocol: 사양값은 DB에서만 가져옴. DB 미등록 모델은 값을 만들지 않고 '확인불가' 처리
+  - 단일 HTML, 백엔드·외부 전송 없음. 회사 데이터 미포함(공개 모델 식별자·공개 사양만)
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNO — 상품 등록 표준화 · Romi Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EAEEF1; --panel:#FFFFFF; --ink:#16202A; --ink-soft:#4A5A68;
+    --indigo:#24417A; --indigo-deep:#172A52; --hair:#D2DAE1;
+    --err:#B23A2E; --err-bg:#FBECEA;
+    --warn:#9A6B12; --warn-bg:#FBF3E2;
+    --ok:#2F6B4F; --ok-bg:#E9F3EE;
+    --unk:#5B6772; --unk-bg:#EEF1F3;
+    --ask:#6A3F96; --ask-bg:#F2ECF8;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans KR',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 16px 80px}
+  header{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--indigo);font-weight:600}
+  h1{font-size:26px;font-weight:700;margin:4px 0 2px;letter-spacing:-.01em}
+  .sub{color:var(--ink-soft);font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:4px}
+  .card-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-soft);padding:12px 16px;border-bottom:1px solid var(--hair);font-weight:600}
+  .card-b{padding:16px}
+  label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 0 4px}
+  .field{margin-bottom:12px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  input,textarea,select{width:100%;font-family:var(--mono);font-size:14px;color:var(--ink);
+    border:1px solid var(--hair);border-radius:3px;padding:9px 10px;background:#FCFDFE;resize:vertical}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--indigo);outline-offset:-1px;border-color:var(--indigo)}
+  textarea{min-height:54px;line-height:1.5}
+  .btn{font-family:var(--sans);font-weight:600;font-size:14px;border:none;border-radius:3px;padding:11px 18px;cursor:pointer}
+  .btn-run{background:var(--indigo);color:#fff;width:100%}
+  .btn-run:hover{background:var(--indigo-deep)}
+  .btn-ghost{background:transparent;border:1px solid var(--hair);color:var(--ink-soft);padding:6px 11px;font-size:12px;font-weight:500}
+  .btn-ghost:hover{border-color:var(--indigo);color:var(--indigo)}
+  .presets{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 4px}
+  .preset-lab{font-size:11px;color:var(--ink-soft);margin-top:12px;font-weight:600}
+  #out{margin-top:22px}
+  .mode{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--indigo);margin-bottom:10px;text-transform:uppercase}
+  .sec{font-size:13px;font-weight:700;color:var(--ink);margin:26px 0 8px;display:flex;align-items:center;gap:8px}
+  .sec .num{font-family:var(--mono);background:var(--ink);color:#fff;border-radius:3px;padding:1px 7px;font-size:11px}
+  .std{background:var(--indigo-deep);color:#fff;border-radius:4px;padding:16px 18px;margin-bottom:14px}
+  .std .lab{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#9FB2D6;margin-bottom:6px}
+  .std .val{font-family:var(--mono);font-size:18px;font-weight:600;word-break:break-all}
+  .keep{background:var(--panel);border:1px solid var(--hair);border-left:4px solid var(--ok);border-radius:4px;padding:12px 16px;margin-bottom:14px;font-size:13px}
+  .keep b{font-family:var(--mono)}
+  .checks{background:var(--panel);border:1px solid var(--hair);border-radius:4px;overflow:hidden}
+  .chk{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--hair);align-items:flex-start}
+  .chk:last-child{border-bottom:none}
+  .badge{flex:0 0 auto;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.04em;
+    padding:3px 8px;border-radius:3px;margin-top:1px;min-width:74px;text-align:center}
+  .b-err{background:var(--err-bg);color:var(--err)}
+  .b-ask{background:var(--ask-bg);color:var(--ask)}
+  .b-warn{background:var(--warn-bg);color:var(--warn)}
+  .b-ok{background:var(--ok-bg);color:var(--ok)}
+  .b-unk{background:var(--unk-bg);color:var(--unk)}
+  .chk .body{flex:1;min-width:0}
+  .chk .t{font-weight:600;font-size:14px}
+  .chk .d{font-size:13px;color:var(--ink-soft);margin-top:2px;word-break:break-word}
+  code{font-family:var(--mono);background:var(--paper);padding:1px 5px;border-radius:3px;font-size:12px}
+  .gen{background:var(--panel);border:1px solid var(--hair);border-radius:4px;overflow:hidden}
+  .gen-row{border-bottom:1px solid var(--hair);padding:12px 16px}
+  .gen-row:last-child{border-bottom:none}
+  .gen-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+  .gen-l{font-size:12px;font-weight:700;color:var(--ink-soft)}
+  .gen-v{font-family:var(--mono);font-size:13px;background:#F7F9FA;border:1px solid #E3E8EC;border-radius:3px;padding:8px 10px;word-break:break-all;white-space:pre-wrap}
+  .gen-v.na{color:var(--unk);font-style:italic;font-family:var(--sans)}
+  .cp{background:var(--indigo);color:#fff;border:none;font-size:12px;padding:5px 12px;border-radius:3px;cursor:pointer;font-family:var(--sans);font-weight:600}
+  .cp:hover{background:var(--indigo-deep)}
+  .cp.done{background:var(--ok)}
+  .src{font-size:12px;color:var(--ink-soft);margin-top:6px}
+  .src a{color:var(--indigo)}
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+  .tbl td{border-bottom:1px solid #EEF1F3;padding:5px 8px;vertical-align:top}
+  .tbl td:first-child{color:var(--ink-soft);font-weight:600;white-space:nowrap;width:130px;background:#F7F9FA}
+  .tbl td:last-child{font-family:var(--mono)}
+  details{margin-top:8px}
+  summary{cursor:pointer;font-size:12px;color:var(--indigo);font-weight:600}
+  .note{font-size:12px;color:var(--ink-soft);margin-top:18px;padding:12px 14px;border:1px dashed var(--hair);border-radius:4px;background:#F7F9FA;line-height:1.6}
+  .note b{color:var(--ink)}
+  .rule p{margin:0 0 10px}
+  .rule b{color:var(--ink)}
+  @media(prefers-reduced-motion:no-preference){
+    #out > *{animation:rise .28s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">CNO · Chief Naming Officer v2 &nbsp;|&nbsp; Romi Lab</div>
+    <h1>CNO — 상품 등록 표준화 Agent</h1>
+    <div class="sub">상품명 사실검증 → 브랜드 · 부가제목 · 키워드 · 중요요약설명 자동 생성 &nbsp;|&nbsp; CPU · 모니터 &nbsp;|&nbsp; 회사 데이터 미포함 · 브라우저 내 처리</div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-h">입력 · 관리자 상품 필드 붙여넣기</div>
+      <div class="card-b">
+        <div class="row2">
+          <div class="field"><label>제조사</label><input id="maker" placeholder="예: 인텔"></div>
+          <div class="field"><label>브랜드 (현재값)</label><input id="brand" placeholder="예: Intel® Core™ i5"></div>
+        </div>
+        <div class="field"><label>상품명</label><input id="name" placeholder="예: 14600K (랩터레이크 리프레시) (벌크)"></div>
+        <div class="field"><label>부가제목 (현재값)</label><input id="sub" placeholder="예: ※ 쿨러 미포함 | ※ A/S 3년"></div>
+        <div class="field"><label>키워드 (현재값)</label><textarea id="kw" placeholder="쉼표 구분"></textarea></div>
+        <div class="row2">
+          <div class="field"><label>A/S 기간 (확인된 경우만)</label>
+            <select id="as"><option value="">미확인 → 부가제목에서 생략</option><option>1년</option><option>2년</option><option>3년</option><option>5년</option></select></div>
+          <div class="field"><label>쿨러 (자동 판정 덮어쓰기)</label>
+            <select id="cooler"><option value="">자동 (상품명 판매구성 기준)</option><option value="in">포함</option><option value="out">미포함</option></select></div>
+        </div>
+        <div class="field"><label>중요요약설명 (현재값, 선택 · CPU 사양 대조 / 모니터 정렬)</label><textarea id="spec" placeholder="파이프 | 구분"></textarea></div>
+        <button class="btn btn-run" onclick="run()">검증 + 생성</button>
+        <div class="preset-lab">실제 오류 유형 예제 (공개 모델명만 사용)</div>
+        <div class="presets" id="presets"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">규칙 (확정)</div>
+      <div class="card-b rule" style="font-size:13.5px;color:var(--ink-soft);line-height:1.7">
+        <p><b>CPU 상품명 · 보존 모드</b><br>데스크톱 <code>모델명 (코드네임) (판매구성)</code>, 서버 <code>모델 Processor (xC, yT, zM Cache, a.bc GHz)</code> 형식은 그대로 둔다. 형식 지적·재작성 제안을 하지 않고, <b>사실 오류만 확인 요청</b>한다(상품명 수정은 담당 승인 사항).</p>
+        <p><b>코드네임</b>은 정식 명칭, 띄어쓰기 표기. 예 <code>랩터레이크 리프레시</code> <code>사파이어 래피즈</code></p>
+        <p><b>부가제목</b> <code>※ 쿨러 포함/미포함 | ※ A/S n년</code> — 쿨러는 판매구성에 명시된 경우만 포함, A/S는 확인된 경우만.</p>
+        <p><b>키워드</b> 모델명 우선, 쉼표 뒤 공백 없음. 포괄어(게이밍·하이엔드 등)·유통어(벌크·정품 등) 제외. 다른 모델 번호 혼입 탐지.</p>
+        <p style="margin:0"><b>중요요약설명</b> 사양값은 <b>CNO 사양 DB에서만</b> 생성. DB 미등록 모델은 값을 만들지 않고 확인불가로 표시.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+/* =========================================================
+   0. 유틸
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const v = id => $(id).value.trim();
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+const C = s => `<code>${esc(s)}</code>`;   // 사용자 입력은 항상 이스케이프해서 출력
+
+/* =========================================================
+   1. 코드네임 정규화 (변형/오타 → 정식, 띄어쓰기 표기)
+   ========================================================= */
+const CN_CANON = {
+  '스카이레이크':'스카이레이크','카비레이크':'카비레이크','케이비레이크':'카비레이크','캐비레이크':'카비레이크',
+  '커피레이크':'커피레이크','커피레이크리프레시':'커피레이크 리프레시','커피레이크-r':'커피레이크 리프레시','커피레이크r':'커피레이크 리프레시',
+  '코멧레이크':'코멧레이크','컴멧레이크':'코멧레이크','로켓레이크':'로켓레이크',
+  '앨더레이크':'앨더레이크','알더레이크':'앨더레이크',
+  '랩터레이크':'랩터레이크','랩터레이크리프레시':'랩터레이크 리프레시','랩터레이크-r':'랩터레이크 리프레시','랩터레이크r':'랩터레이크 리프레시',
+  '애로우레이크':'애로우레이크','애로우레이크리프레시':'애로우레이크 리프레시',
+  '서밋릿지':'서밋 릿지','피나클릿지':'피나클 릿지','마티스':'마티스','버미어':'버미어','라파엘':'라파엘','그래니트릿지':'그래니트 릿지',
+  '튜린':'튜린','제노아':'제노아','베르가모':'베르가모',
+  '스카이레이크-sp':'스카이레이크-SP','스카이레이크sp':'스카이레이크-SP',
+  '캐스케이드레이크':'캐스케이드레이크','캐스케이드레이크sp':'캐스케이드레이크',
+  '아이스레이크-sp':'아이스레이크-SP','아이스레이크sp':'아이스레이크-SP',
+  '사파이어래피즈':'사파이어 래피즈','사파이어레피즈':'사파이어 래피즈','세이퍼래피즈':'사파이어 래피즈',
+  '에메랄드래피즈':'에메랄드 래피즈','에메랄드레피즈':'에메랄드 래피즈',
+  '그래니트래피즈':'그래니트 래피즈','그래니트레피즈':'그래니트 래피즈','그래나이트래피즈':'그래니트 래피즈',
+  '시에라포레스트':'시에라 포레스트'
+};
+const CN_SET = new Set(Object.values(CN_CANON));
+const cnKey = s => (s||'').toLowerCase().replace(/[\s\-]/g,'');
+function canonCN(s){ const k=cnKey(s); return CN_CANON[k] || CN_CANON[k.replace(/-/g,'')] || (s||'').trim(); }
+
+/* =========================================================
+   2. CPU 사양 DB (Intel 데스크톱 · 공개 사양)
+   - 값 출처: Intel ARK 공식 사양 기준으로 입력한 시드 데이터
+   - chk: 'seed' = ARK 개별 페이지 재확인 전 / 'ark' = ARK 개별 확인 완료
+   - 새 모델은 아래 BASE에 한 줄 추가하면 F/KF 파생까지 자동 생성
+   ========================================================= */
+const GEN = {
+  12:{label:'12세대',sum:'12세대 Core',cn:'앨더레이크',socket:'LGA1700',proc:'Intel 7',maxmem:128,pcie:'5.0/4.0',lanes:20},
+  13:{label:'13세대',sum:'13세대 Core',cn:'랩터레이크',socket:'LGA1700',proc:'Intel 7',maxmem:192,pcie:'5.0/4.0',lanes:20},
+  14:{label:'14세대',sum:'14세대 Core',cn:'랩터레이크 리프레시',socket:'LGA1700',proc:'Intel 7',maxmem:192,pcie:'5.0/4.0',lanes:20},
+  U2:{label:'코어 울트라 200S',sum:'Core Ultra 200S',cn:'애로우레이크',socket:'LGA1851',proc:'TSMC N3B',maxmem:256,pcie:'5.0/4.0',lanes:24},
+  // Plus: Intel ARK 코드명은 Arrow Lake. '리프레시'는 사내 상품명 표기를 따름
+  U2P:{label:'코어 울트라 200S Plus',sum:'Core Ultra 200S Plus',cn:'애로우레이크 리프레시',socket:'LGA1851',proc:'TSMC N3B',maxmem:256,pcie:'5.0/4.0',lanes:24}
+};
+// [모델, 세대, 티어, P, E, P기본, P최대, E기본, E최대, 최대클럭, L2, L3, 기본전력, 최대터보전력, 메모리, 내장GPU, GPU최대(GHz), 파생]
+const BASE = [
+  ['12100',12,'i3',4,0,3.3,4.3,null,null,4.3,5,12,60,89,'DDR5-4800/DDR4-3200','UHD 730',1.4,'F'],
+  ['12400',12,'i5',6,0,2.5,4.4,null,null,4.4,7.5,18,65,117,'DDR5-4800/DDR4-3200','UHD 730',1.45,'F'],
+  ['12500',12,'i5',6,0,3.0,4.6,null,null,4.6,7.5,18,65,117,'DDR5-4800/DDR4-3200','UHD 770',1.45,''],
+  ['12600',12,'i5',6,0,3.3,4.8,null,null,4.8,7.5,18,65,117,'DDR5-4800/DDR4-3200','UHD 770',1.45,''],
+  ['12600K',12,'i5',6,4,3.7,4.9,2.8,3.6,4.9,9.5,20,125,150,'DDR5-4800/DDR4-3200','UHD 770',1.45,'KF'],
+  ['12700',12,'i7',8,4,2.1,4.8,1.6,3.6,4.9,12,25,65,180,'DDR5-4800/DDR4-3200','UHD 770',1.5,'F'],
+  ['12700K',12,'i7',8,4,3.6,4.9,2.7,3.8,5.0,12,25,125,190,'DDR5-4800/DDR4-3200','UHD 770',1.5,'KF'],
+  ['12900',12,'i9',8,8,2.4,5.0,1.8,3.8,5.1,14,30,65,202,'DDR5-4800/DDR4-3200','UHD 770',1.55,'F'],
+  ['12900K',12,'i9',8,8,3.2,5.1,2.4,3.9,5.2,14,30,125,241,'DDR5-4800/DDR4-3200','UHD 770',1.55,'KF'],
+  ['13100',13,'i3',4,0,3.4,4.5,null,null,4.5,5,12,60,110,'DDR5-4800/DDR4-3200','UHD 730',1.5,'F'],
+  ['13400',13,'i5',6,4,2.5,4.6,1.8,3.3,4.6,9.5,20,65,148,'DDR5-4800/DDR4-3200','UHD 730',1.55,'F'],
+  ['13500',13,'i5',6,8,2.5,4.8,1.8,3.5,4.8,11.5,24,65,154,'DDR5-4800/DDR4-3200','UHD 770',1.55,''],
+  ['13600K',13,'i5',6,8,3.5,5.1,2.6,3.9,5.1,20,24,125,181,'DDR5-5600/DDR4-3200','UHD 770',1.5,'KF'],
+  ['13700',13,'i7',8,8,2.1,5.1,1.5,4.1,5.2,24,30,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.6,'F'],
+  ['13700K',13,'i7',8,8,3.4,5.3,2.5,4.2,5.4,24,30,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.6,'KF'],
+  ['13900',13,'i9',8,16,2.0,5.2,1.5,4.2,5.6,32,36,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.65,'F'],
+  ['13900K',13,'i9',8,16,3.0,5.4,2.2,4.3,5.8,32,36,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.65,'KF'],
+  ['14100',14,'i3',4,0,3.5,4.7,null,null,4.7,5,12,60,110,'DDR5-4800/DDR4-3200','UHD 730',1.5,'F'],
+  ['14400',14,'i5',6,4,2.5,4.7,1.8,3.5,4.7,9.5,20,65,148,'DDR5-4800/DDR4-3200','UHD 730',1.55,'F'],
+  ['14500',14,'i5',6,8,2.6,5.0,1.9,3.7,5.0,11.5,24,65,154,'DDR5-4800/DDR4-3200','UHD 770',1.55,''],
+  ['14600K',14,'i5',6,8,3.5,5.3,2.6,4.0,5.3,20,24,125,181,'DDR5-5600/DDR4-3200','UHD 770',1.55,'KF'],
+  ['14700',14,'i7',8,12,2.1,5.3,1.5,4.2,5.4,28,33,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.6,'F'],
+  ['14700K',14,'i7',8,12,3.4,5.5,2.5,4.3,5.6,28,33,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.6,'KF'],
+  ['14900',14,'i9',8,16,2.0,5.4,1.5,4.3,5.8,32,36,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.65,'F'],
+  ['14900K',14,'i9',8,16,3.2,5.6,2.4,4.4,6.0,32,36,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.65,'KF'],
+  ['225','U2','U5',6,4,3.3,4.9,2.7,4.4,4.9,22,20,65,121,'DDR5-6400','Intel Graphics',1.8,'F'],
+  ['235','U2','U5',6,8,3.4,5.0,2.9,4.4,5.0,26,24,65,121,'DDR5-6400','Intel Graphics',2.0,''],
+  ['245','U2','U5',6,8,3.5,5.1,3.0,4.5,5.1,26,24,65,121,'DDR5-6400','Intel Graphics',1.9,''],
+  ['245K','U2','U5',6,8,4.2,5.2,3.6,4.6,5.2,26,24,125,159,'DDR5-6400','Intel Graphics',1.9,'KF'],
+  ['265','U2','U7',8,12,2.4,5.2,1.8,4.6,5.3,36,30,65,182,'DDR5-6400','Intel Graphics',1.95,'F'],
+  ['265K','U2','U7',8,12,3.9,5.4,3.3,4.6,5.5,36,30,125,250,'DDR5-6400','Intel Graphics',2.0,'KF'],
+  ['285','U2','U9',8,16,2.5,5.4,1.9,4.6,5.6,40,36,65,182,'DDR5-6400','Intel Graphics',2.0,''],
+  ['285K','U2','U9',8,16,3.7,5.5,3.2,4.6,5.7,40,36,125,250,'DDR5-6400','Intel Graphics',2.0,''],
+  ['250KPLUS','U2P','U5',6,12,4.2,5.3,3.3,4.6,5.3,30,30,125,159,'DDR5-7200','Intel Graphics',1.9,'KF'],
+  ['270KPLUS','U2P','U7',8,16,3.7,5.4,3.2,4.7,5.5,40,36,125,250,'DDR5-7200','Intel Graphics',2.0,'']
+];
+// F 모델 중 기본 전력이 다른 예외 (i3 F: 58W)
+const F_POWER = {'12100F':58,'13100F':58,'14100F':58}; // ARK 확인
+// ARK 개별 페이지 재확인 완료 모델 (담당자가 확인 후 추가)
+// 2026-11-05 Intel 공식 사양 페이지(intel.com/products/sku) 개별 대조 완료
+const ARK_VERIFIED = new Set(['12100','12100F','12400','12500','12600','12600K','12700','12700K','12900','12900K',
+  '13100','13100F','13400','13500','13600K','13900','13900K',
+  '14100','14100F','14400','14500','14600K','14700','14700K','14900','14900K',
+  '225','235','245','245K','265','265K','285','285K','250KPLUS','270KPLUS']);
+
+const DB = {};
+BASE.forEach(r=>{
+  const [model,gen,tier,p,e,pb,pt,eb,et,max,l2,l3,bp,mtp,mem,gpu,gf,der]=r;
+  const ent={model,gen,tier,p,e,t:(/^U2/.test(gen)?p+e:p*2+e),pb,pt,eb,et,max,l2,l3,bp,mtp,mem,gpu,gf,k:/K$/.test(model),ht:!/^U2/.test(gen)};
+  ent.disp=model.replace(/K?F?PLUS$/,m=>m.replace('PLUS','')+' Plus');
+  DB[model]=ent;
+  if(der==='F'){ DB[model+'F']={...ent,model:model+'F',disp:model+'F',gpu:null,bp:F_POWER[model+'F']||bp}; }
+  if(der==='KF'){ const fm=/PLUS$/.test(model)?model.replace('KPLUS','KFPLUS'):model+'F'; DB[fm]={...ent,model:fm,disp:fm.replace(/K?F?PLUS$/,m=>m.replace('PLUS','')+' Plus'),gpu:null}; } // 14600K → 14600KF, 250K Plus → 250KF Plus
+});
+Object.values(DB).forEach(d=>d.chk = ARK_VERIFIED.has(d.model)?'ark':'seed');
+const arkURL = m => `https://www.intel.com/content/www/us/en/search.html#q=${encodeURIComponent(m)}`;
+
+/* =========================================================
+   3. 코드네임 추론 (DB 우선 → 규칙 → 확인불가)
+   ========================================================= */
+function inferCodename(maker, brand, model){
+  const m=(model||'').toUpperCase().replace(/\s+/g,'');
+  const b=brand||'', mk=(maker||'').replace(/\s+/g,'');
+  // DB 등록 모델 = 가장 높은 신뢰도
+  if(DB[m]) return {cn:GEN[DB[m].gen].cn,conf:'confirmed',note:'CNO 사양 DB 기준'};
+
+  // AMD EPYC
+  if(/EPYC/i.test(b+m)){
+    const num=m.match(/\d{4}/);
+    if(num){ const last=num[0].slice(-1);
+      if(last==='5') return {cn:'튜린',conf:'medium',note:'끝자리 5 → 9005 시리즈 추론. AMD 공식 재확인 권장'};
+      if(last==='4') return {cn:'제노아',conf:'medium',note:'끝자리 4 → 9004 시리즈 추론. c코어는 베르가모. AMD 공식 재확인 권장'}; }
+    return {cn:null,conf:'unknown',note:'EPYC 모델 자동확인 불가 → 수동 검증'};
+  }
+  // AMD Ryzen
+  if(/라이젠|RYZEN/i.test(b+mk)){
+    if(/G/.test(m.replace(/X3D/i,''))) return {cn:null,conf:'unknown',note:'APU(G 접미)는 코드네임 상이 → 수동 검증'};
+    const num=m.match(/\d{4}/);
+    if(num){ const t=num[0][0];
+      const map={'1':'서밋 릿지','2':'피나클 릿지','3':'마티스','5':'버미어','7':'라파엘','9':'그래니트 릿지'};
+      if(map[t]) return {cn:map[t],conf:'confirmed',note:'라이젠 데스크톱 시리즈 규칙 기반'}; }
+    return {cn:null,conf:'unknown',note:'라이젠 모델 자동확인 불가 → 수동 검증'};
+  }
+  const isIntel = /인텔|INTEL/i.test(mk)||/코어|CORE|펜티엄|PENTIUM|셀러론|CELERON|XEON|제온|ULTRA|울트라/i.test(b)||/^(I[3579]-?)?\d{4,5}|^W[3579]-|^E-\d{4}|^G\d{4}/.test(m);
+  if(!isIntel) return {cn:null,conf:'unknown',note:'제조사/브랜드 정보 부족 → 수동 검증'};
+
+  // Xeon W (워크스테이션): W-2400/3400, W-2500/3500 → 사파이어 래피즈
+  let w=m.match(/^W[3579]-(\d)(\d)\d{2}/);
+  if(w){ const s=w[1]+w[2];
+    if(['24','34','25','35'].includes(s)) return {cn:'사파이어 래피즈',conf:'medium',note:`Xeon W-${s}00 시리즈 → 사파이어 래피즈. 인텔 ARK 확인 권장`};
+    return {cn:null,conf:'unknown',note:'Xeon W 세대 자동판정 불가 → 인텔 ARK 수동 확인'}; }
+  // Xeon E: E-2300 로켓레이크 / E-2400 랩터레이크
+  let e=m.match(/^E-2(\d)\d{2}/);
+  if(e){ const map={'3':'로켓레이크','4':'랩터레이크'};
+    if(map[e[1]]) return {cn:map[e[1]],conf:'medium',note:`Xeon E-2${e[1]}00 시리즈 → ${map[e[1]]}. 인텔 ARK 확인 권장`};
+    return {cn:null,conf:'unknown',note:'Xeon E 세대 자동판정 불가 → 인텔 ARK 수동 확인'}; }
+  // Xeon Scalable / Xeon 6
+  if(/XEON|제온/i.test(b) || /PROCESSOR/i.test(model||'')){
+    const mm=m.match(/^(\d{4})([A-Z+]*)/);
+    if(mm){ const num=mm[1], suf=mm[2]||'';
+      if(num[0]==='6' && /P/.test(suf)) return {cn:'그래니트 래피즈',conf:'medium',note:'Xeon 6 P코어(P 접미) → 그래니트 래피즈. 인텔 ARK 확인 권장'};
+      if(num[0]==='6' && /E/.test(suf)) return {cn:'시에라 포레스트',conf:'medium',note:'Xeon 6 E코어(E 접미) → 시에라 포레스트. 인텔 ARK 확인 권장'};
+      const xmap={1:'스카이레이크-SP',2:'캐스케이드레이크',3:'아이스레이크-SP',4:'사파이어 래피즈',5:'에메랄드 래피즈'};
+      const d2=parseInt(num[1]);
+      if(xmap[d2]) return {cn:xmap[d2],conf:'medium',note:`Xeon Scalable ${d2}세대(모델 둘째 자리 규칙) → ${xmap[d2]}. 인텔 ARK 확인 권장`}; }
+    return {cn:null,conf:'unknown',note:'Xeon 모델 세대 자동판정 불가 → 인텔 ARK 수동 확인'};
+  }
+  // 코어 울트라
+  if(/ULTRA|울트라/i.test(b) || /^2\d{2}[KF]*(PLUS)?$/.test(m)){
+    if(/PLUS/.test(m)) return {cn:'애로우레이크 리프레시',conf:'medium',note:'Plus 모델 → 애로우레이크 리프레시(사내 표기). 인텔 공식은 애로우레이크로 표기 — 확인 권장'};
+    if(/^2\d{2}/.test(m)) return {cn:'애로우레이크',conf:'medium',note:'코어 울트라 200S → 애로우레이크'};
+    return {cn:null,conf:'unknown',note:'코어 울트라 시리즈 자동판정 불가 → 수동 검증'};
+  }
+  if(/펜티엄|PENTIUM|셀러론|CELERON/i.test(b)||/^G\d/.test(m)) return {cn:null,conf:'unknown',note:'펜티엄/셀러론은 모델별 세대 편차 큼 → 수동 검증'};
+  // 코어 i 세대 규칙
+  const d=m.match(/^(?:I[3579]-?)?(\d{4,5})/);
+  if(d){ const n=d[1]; const g = n.length===5?parseInt(n.slice(0,2)):parseInt(n[0]);
+    const gm={6:'스카이레이크',7:'카비레이크',8:'커피레이크',9:'커피레이크 리프레시',10:'코멧레이크',11:'로켓레이크',12:'앨더레이크',13:'랩터레이크',14:'랩터레이크 리프레시'};
+    if(gm[g]) return {cn:gm[g],conf:'confirmed',note:'인텔 코어 세대 규칙 기반'};
+  }
+  return {cn:null,conf:'unknown',note:'인텔 세대 추정 불가 → 수동 검증'};
+}
+
+/* =========================================================
+   4. 상품명 파싱 (CPU)
+   ========================================================= */
+const SALE_RE = /정품|벌크|병행|박스|box|tray|트레이|밸류팩|멀티\s*팩|리테일|쿨러|RM1|RS1|RH1|동판|클린풀|리퍼/i;
+const SERVER_SPEC_RE = /^\s*(\d+)C,\s*(\d+)T,\s*(\d+(?:\.\d+)?)M Cache,\s*(\d+(?:\.\d+)?)\s*GHz\s*$/i;
+function parseCpuName(name){
+  const parens=[...name.matchAll(/\(([^)]*)\)/g)].map(x=>x[1].trim());
+  const outside=name.replace(/\([^)]*\)/g,' ').replace(/\s+/g,' ').trim();
+  const isServerFmt=/\bProcessor\b/i.test(outside);
+  let model=(outside.split(/\s+/)[0]||'').trim();
+  // "i5-14600K" / "코어i5 14600K" 처럼 앞에 붙은 접두는 정리
+  model=model.replace(/^(코어)?i[3579]-?/i,'');
+  if(/^(울트라|ULTRA)\d?$/i.test(model)) model=(outside.split(/\s+/)[1]||'');
+  const plus=/\bPLUS\b|플러스/i.test(outside);
+  const groups=parens.map(p=>{
+    if(SERVER_SPEC_RE.test(p)||/\d+\s*C\b.*\d+\s*T\b/i.test(p)) return {text:p,kind:'spec'};
+    if(SALE_RE.test(p)) return {text:p,kind:'sale'};
+    const c=canonCN(p);
+    if(CN_SET.has(c)) return {text:p,kind:'cn',canon:c};
+    return {text:p,kind:'unknown'};
+  });
+  return {model:(model+(plus?'PLUS':'')).toUpperCase(), rawModel:model, plus, groups, isServerFmt, outside};
+}
+
+/* =========================================================
+   5. 쿨러 판정 (근거 없으면 '포함'으로 가정하지 않음)
+   ========================================================= */
+function judgeCooler(sale, dbEnt, override){
+  if(override==='in') return {state:'in',text:'포함',why:'담당자 지정'};
+  if(override==='out') return {state:'out',text:'미포함',why:'담당자 지정'};
+  const s=sale||'';
+  const tag = /병행/.test(s)?'병행수입':(/벌크|bulk/i.test(s)?'벌크':(/정품|박스|box/i.test(s)?'정품박스':''));
+  const tagTxt = tag?`(${tag})`:'';
+  let m;
+  if((m=s.match(/R[MSH]1/i))) return {state:'in',text:`Intel ${m[0].toUpperCase()} 포함${tagTxt}`,why:`판매구성에 ${m[0].toUpperCase()} 명시`};
+  if(/동판/.test(s)) return {state:'in',text:`동판쿨러 포함${tagTxt}`,why:'판매구성에 동판쿨러 명시'};
+  if(/쿨러/.test(s) && !/미포함|없음/.test(s)) return {state:'in',text:`포함${tagTxt}`,why:'판매구성에 쿨러 명시'};
+  if(/미포함|없음/.test(s)) return {state:'out',text:'미포함',why:'판매구성에 미포함 명시'};
+  if(tag==='벌크') return {state:'out',text:'미포함',why:'벌크 + 쿨러 표기 없음'};
+  if(tag==='정품박스' && dbEnt && dbEnt.k) return {state:'out',text:'미포함',why:'K/KF 정품박스는 쿨러 미동봉'};
+  return {state:'unk',text:null,why:'판매구성만으로 쿨러 동봉 여부를 확정할 수 없음 (정품박스·병행수입·표기 없음)'};
+}
+
+/* =========================================================
+   6. 생성기: 브랜드 / 부가제목 / 키워드 / 중요요약설명
+   ========================================================= */
+const BANNED = ['게이밍','하이엔드','고급','사무용','가성비','최저가','특가','벌크','정품','정품박스','병행','병행수입','쿨러','쿨러포함','쿨러미포함','서버용','트레이','tray','box','멀티팩'];
+const KW_TYPO = {'세이퍼래피즈':'사파이어래피즈'};
+function brandOf(ent, model){
+  const tier = ent?ent.tier:((model.match(/^I([3579])/i)||[])[1]?'i'+model.match(/^I([3579])/i)[1]:null);
+  if(!tier) return null;
+  if(tier[0]==='U') return `Intel® Core™ Ultra ${tier[1]}`;
+  return `Intel® Core™ ${tier}`;
+}
+function genKeywords(ent, P, oldKw){
+  const out=[], push=s=>{ if(s && !out.some(x=>x.toLowerCase()===s.toLowerCase())) out.push(s); };
+  const g=GEN[ent.gen], cnNoSp=g.cn.replace(/\s/g,'');
+  push(ent.disp);
+  if(/^U2/.test(ent.gen)){ const n=ent.tier[1];
+    push(`울트라${n} ${ent.disp}`); push(`코어울트라${n}`); push(`Ultra${n}`); push('인텔'); push('intel'); push('코어울트라200S');
+  }else{
+    push(`${ent.tier}-${ent.model}`); push(`코어${ent.tier}`); push('인텔'); push('intel'); push(g.label);
+  }
+  push(g.cn); push(cnNoSp); push(g.socket);
+  // 기존 키워드 중 유효한 것 유지 (포괄어·유통어·다른 모델 제외)
+  const removed=[], foreign=[], typo=[];
+  (oldKw||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(k=>{
+    const kl=k.toLowerCase().replace(/\s/g,'');
+    if(KW_TYPO[kl]){ typo.push(k); push(KW_TYPO[kl]); return; }
+    if(BANNED.some(b=>kl===b.toLowerCase())){ removed.push(k); return; }
+    const mm=k.toUpperCase().match(/\b(?:I[3579]-?)?(\d{4,5}[A-Z]*|[WE]\d?-\d{4}[A-Z+]*|G\d{4}[A-Z]*)\b/);
+    if(mm){ const id=mm[1].replace(/^I[3579]-?/,''); if(id!==ent.model){ foreign.push(k); return; } }
+    if(/^i[3579]$/i.test(k)){ removed.push(k); return; } // 단독 티어명은 포괄어
+    push(k);
+  });
+  return {kw:out.join(','),removed,foreign,typo};
+}
+function genSummary(ent, cooler){
+  // 현행 등록 형식 그대로 (예: 14100 정품벌크 등록본 기준)
+  const g=GEN[ent.gen], f=n=>(n%1===0?n.toFixed(1):String(n));
+  const parts=[
+    `${g.sum}(${g.cn})`, `소켓:${g.socket}`, `공정:${g.proc}`,
+    `${ent.p+ent.e}코어(P${ent.p}+E${ent.e})`, `${ent.t}스레드`,
+    `P코어 클럭:${f(ent.pb)}~${f(ent.pt)}GHz`
+  ];
+  if(ent.e>0) parts.push(`E코어 클럭:${f(ent.eb)}~${f(ent.et)}GHz`);
+  parts.push(`최대 클럭:${f(ent.max)}GHz`,`L2 캐시:${ent.l2}MB`,`L3 캐시:${ent.l3}MB`,
+    `기본 전력:${ent.bp}W`,`최대 터보 전력:${ent.mtp}W`,`메모리:${ent.mem}`,`메모리 채널:2채널`,`최대 메모리:${g.maxmem}GB`,
+    `PCIe ${g.pcie}`,`PCIe 레인:${g.lanes}`,
+    ent.gpu?`내장그래픽:${ent.gpu}(최대 ${f(ent.gf)}GHz)`:'내장그래픽:미탑재');
+  if(ent.gpu) parts.push('퀵싱크 지원');
+  if(ent.ht) parts.push('하이퍼스레딩');
+  if(ent.k) parts.push('오버클럭 지원');
+  parts.push(`쿨러:${cooler.state==='unk'?'[확인 필요]':cooler.text}`);
+  return parts.join('|');
+}
+
+/* =========================================================
+   7. CPU 검증 + 생성 (보존 모드)
+   ========================================================= */
+function processCpu(I){
+  const checks=[], P=parseCpuName(I.name);
+  const ent=DB[P.model]||null;
+  const isServer = P.isServerFmt || /XEON|제온/i.test(I.brand) || /^[WE]\d?-\d{4}/.test(P.model);
+  const inf=inferCodename(I.maker,I.brand,P.model);
+  const ask=(t,d)=>checks.push({sev:'ask',t,d});
+
+  // (a) 제조사 ↔ 브랜드
+  if(/인텔/.test(I.maker)&&/라이젠|RYZEN|EPYC/i.test(I.brand)) checks.push({sev:'err',t:'제조사↔브랜드 불일치',d:`제조사 ${C(I.maker)} / 브랜드 ${C(I.brand)}`});
+  if(/AMD/i.test(I.maker)&&/코어|CORE|XEON|제온/i.test(I.brand)) checks.push({sev:'err',t:'제조사↔브랜드 불일치',d:`제조사 ${C(I.maker)} / 브랜드 ${C(I.brand)}`});
+
+  // (b) 코드네임 사실검증 (형식은 건드리지 않음)
+  const cnG=P.groups.find(g=>g.kind==='cn');
+  if(cnG){
+    if(cnG.text!==cnG.canon) ask('코드네임 표기 확인',`${C(cnG.text)} → 정식 표기 ${C(cnG.canon)}`);
+    if(inf.cn){
+      if(canonCN(cnG.canon)===canonCN(inf.cn)) checks.push({sev:'ok',t:'코드네임 일치',d:`${C(cnG.canon)} — ${esc(inf.note)}`});
+      else ask('코드네임 사실 오류 의심',`상품명 ${C(cnG.text)} ↔ 판정 ${C(inf.cn)} · 근거: ${esc(inf.note)}`);
+    }else checks.push({sev:'unk',t:'코드네임 확인불가',d:`${C(cnG.text)} — ${esc(inf.note)}`});
+  }else if(!isServer){
+    if(inf.cn) ask('코드네임 누락',`상품명에 코드네임 없음. 참고: ${C('('+inf.cn+')')}`);
+    else checks.push({sev:'unk',t:'코드네임 없음 / 확인불가',d:esc(inf.note)});
+  }else if(inf.cn){
+    checks.push({sev:'ok',t:'서버 CPU 세대 참고',d:`${C(inf.cn)} — ${esc(inf.note)} (상품명에는 표기하지 않는 형식)`});
+  }
+
+  // (c) 서버 Processor 형식 내부 오류 (형식 자체는 정상으로 인정)
+  const specG=P.groups.find(g=>g.kind==='spec');
+  if(P.isServerFmt){
+    if(!specG) ask('서버 형식 괄호 누락',`${C('(xC, yT, zM Cache, a.bc GHz)')} 괄호가 없음`);
+    else{
+      const sm=specG.text.match(SERVER_SPEC_RE);
+      if(!sm) ask('서버 형식 표기 확인',`${C(specG.text)} — 기준 ${C('24C, 48T, 144M Cache, 2.40 GHz')}`);
+      else{
+        if(!/\d\sGHz/i.test(specG.text)) ask('GHz 앞 공백 누락',`${C(specG.text)} → ${C(sm[4]+' GHz')}`);
+        if(!/^\d+\.\d{2}$/.test(sm[4])) ask('클럭 소수점 2자리',`${C(sm[4])} → ${C(parseFloat(sm[4]).toFixed(2))}`);
+        if(parseInt(sm[2])!==parseInt(sm[1])*2 && parseInt(sm[2])!==parseInt(sm[1])) checks.push({sev:'warn',t:'코어·스레드 비율 확인',d:`${C(sm[1]+'C / '+sm[2]+'T')} — 일반적 비율(1:1, 1:2)이 아님. 공식 사양 확인`});
+        checks.push({sev:'ok',t:'서버 Processor 형식 인정',d:'형식 유지 (값 검증은 서버 사양 DB 단계에서 확장 예정)'});
+      }
+    }
+  }
+  // (d) 판매구성 — 형식은 인정, 내용만 확인
+  const saleG=P.groups.filter(g=>g.kind==='sale').map(g=>g.text).join(' / ');
+  if(saleG) checks.push({sev:'ok',t:'판매구성 표기 인정',d:`${C(saleG)} — 상품명 유지 (보존 모드)`});
+  P.groups.filter(g=>g.kind==='unknown').forEach(g=>checks.push({sev:'unk',t:'분류 불가 괄호',d:`${C('('+g.text+')')} — 코드네임/판매구성/사양 어디에도 해당하지 않음`}));
+  if(/Processor/i.test(P.outside) && /정품|벌크|tray|box/i.test(saleG)) checks.push({sev:'warn',t:'서버 Tray/Box 위치',d:'서버 CPU의 Tray/Box 정보는 부가제목에 두는 규칙'});
+
+  // (e) 쿨러 판정 + 부가제목 충돌
+  const cooler=judgeCooler(saleG, ent, I.cooler);
+  if(I.sub){
+    const subIn=/쿨러\s*포함/.test(I.sub), subOut=/쿨러\s*미포함/.test(I.sub);
+    if(cooler.state==='in'&&subOut) checks.push({sev:'err',t:'상품명↔부가제목 쿨러 충돌',d:`판매구성 ${C(saleG)} 에 쿨러가 있는데 부가제목은 ${C('쿨러 미포함')}`});
+    if(cooler.state==='out'&&subIn) checks.push({sev:'err',t:'상품명↔부가제목 쿨러 충돌',d:`근거(${esc(cooler.why)})는 미포함인데 부가제목은 ${C('쿨러 포함')}`});
+  }
+  if(cooler.state==='unk' && !isServer) checks.push({sev:'warn',t:'쿨러 동봉 여부 확인 필요',d:`${esc(cooler.why)}. 공급사 확인 후 '쿨러' 선택값으로 지정 — 근거 없이 포함으로 쓰지 않음`});
+
+  // (f) DB 조회 + 현재 중요요약 대조
+  if(ent){
+    checks.push({sev:'ok',t:'사양 DB 등록 모델',d:`${C(ent.model)} — ${ent.chk==='ark'?'Intel ARK 개별 확인 완료':'Intel ARK 기준 시드값 (개별 재확인 권장)'}`});
+    if(I.spec){
+      const cores=(I.spec.match(/(\d+)\s*코어/)||[])[1], thr=(I.spec.match(/스레드\s*:?\s*(\d+)/)||I.spec.match(/(\d+)\s*스레드/)||[])[1];
+      const l3=(I.spec.match(/L3[^|:]*:?\s*(\d+(?:\.\d+)?)\s*MB/i)||[])[1];
+      if(cores && parseInt(cores)!==ent.p+ent.e) checks.push({sev:'err',t:'중요요약 사양 불일치 · 코어',d:`현재값 ${C(cores+'코어')} ↔ DB ${C((ent.p+ent.e)+'코어')}`});
+      if(thr && parseInt(thr)!==ent.t) checks.push({sev:'err',t:'중요요약 사양 불일치 · 스레드',d:`현재값 ${C(thr)} ↔ DB ${C(ent.t)}`});
+      if(l3 && parseFloat(l3)!==ent.l3) checks.push({sev:'err',t:'중요요약 사양 불일치 · L3',d:`현재값 ${C(l3+'MB')} ↔ DB ${C(ent.l3+'MB')}`});
+      const other=[...I.spec.matchAll(/\b(\d{4,5}[A-Z]{0,2})\b/g)].map(x=>x[1]).filter(x=>/[A-Z]/.test(x)||x.length===5).filter(x=>x!==ent.model && DB[x]);
+      if(other.length) checks.push({sev:'err',t:'중요요약에 다른 모델 혼입 의심',d:`${other.map(C).join(' ')}`});
+    }
+  }else{
+    checks.push({sev:'unk',t:'사양 DB 미등록 모델',d:`${C(P.rawModel||P.model)} — 중요요약 사양값을 생성하지 않음. Intel ARK 확인 후 DB 추가 필요`});
+  }
+
+  // (g) 브랜드 대조
+  const brandNew = ent?brandOf(ent,P.model):(isServer?null:brandOf(null,((I.name+' '+I.brand).match(/i[3579]/i)||[''])[0]));
+  if(brandNew && I.brand && I.brand.replace(/\s/g,'')!==brandNew.replace(/\s/g,'')) checks.push({sev:'warn',t:'브랜드 표기 변경 제안',d:`${C(I.brand)} → ${C(brandNew)}`});
+
+  // ---- 생성 ----
+  const gen={};
+  gen.brand = brandNew;
+  // 부가제목
+  if(isServer){
+    gen.sub = null; // 서버 부가제목은 공급 조건(Tray·리드타임·취소 규정) → 현재값 유지
+  }else{
+    gen.sub = [cooler.state==='unk'?'※ 쿨러 [포함/미포함 확인]':`※ 쿨러 ${cooler.state==='in'?'포함':'미포함'}`, I.as?`※ A/S ${I.as}`:null].filter(Boolean).join(' | ');
+  }
+  if(!I.as && !isServer) checks.push({sev:'unk',t:'A/S 기간 미입력',d:'확인된 A/S 기간이 없으면 부가제목에서 생략 (추정 금지)'});
+  // 키워드 · 요약
+  let kwInfo=null;
+  if(ent){
+    kwInfo=genKeywords(ent,P,I.kw);
+    gen.kw=kwInfo.kw;
+    gen.sum=genSummary(ent,cooler);
+    if(kwInfo.removed.length) checks.push({sev:'warn',t:'키워드 제외 (포괄어·유통어)',d:kwInfo.removed.map(C).join(' ')});
+    if(kwInfo.foreign.length) checks.push({sev:'err',t:'키워드에 다른 모델 혼입',d:kwInfo.foreign.map(C).join(' ')+' — 다른 상품 키워드 복사 의심'});
+    if(kwInfo.typo.length) checks.push({sev:'warn',t:'키워드 오타 교정',d:kwInfo.typo.map(C).join(' ')});
+  }
+  return {checks,gen,ent,cooler,category:'cpu',P,isServer};
+}
+
+/* =========================================================
+   8. 모니터 (기존 v1 규칙 유지 · 표준 상품명 제안)
+   ========================================================= */
+const MON_RES=['FHD','QHD','UHD','WQHD','UWQHD','4K','5K'];
+const REFRESH=[60,75,90,100,120,144,165,180,200,240,280,300,360];
+const MON_JUNK=[/게이밍\s*모니터/,/(?<!커브드\s)모니터$/,/후속\s*모델/,/신제품/,/초특가|특가|무료배송|당일발송/];
+function processMonitor(I,F){
+  F=F||{};
+  const checks=[]; const N=I.name.replace(/\s+/g,' ').trim(); const tokens=N.split(' ');
+  let model=tokens[0]||'';
+  if(!/\d/.test(model) && tokens[1] && /[A-Z]/i.test(tokens[1]) && /\d/.test(tokens[1]) && !/인치|Hz/i.test(tokens[1])) model=model+' '+tokens[1];
+  const sizeM=N.match(/(\d{2,3})\s*인치/)||N.match(/(\d{2,3})\s*"/); const size=sizeM?sizeM[1]:null;
+  const form=/커브드|커브|curved/i.test(N)?'커브드':(/평면|flat/i.test(N)?'평면':null);
+  const panelM=N.match(/\b(IPS|VA|TN|OLED)\b/i); const panel=panelM?panelM[1].toUpperCase():null;
+  const res=MON_RES.find(r=>new RegExp('\\b'+r+'\\b','i').test(N))||null;
+  const hzM=N.match(/(\d{2,3})\s*Hz/i); let refresh=hzM?hzM[1]:null, hzBare=null;
+  if(!refresh){ const nums=[...N.matchAll(/\b(\d{2,3})\b/g)].map(x=>parseInt(x[1])); hzBare=nums.find(n=>REFRESH.includes(n)&&n!==parseInt(size)); }
+  const feats=[];
+  [[/4면\s*보더리스/,'4면보더리스'],[/(?<!4면\s*)보더리스/,'보더리스'],[/높낮이/,'높낮이'],[/USB-?C/i,'USB-C'],[/베젤리스/,'베젤리스'],[/무결점/,'무결점'],[/피벗/,'피벗'],[/화이트/,'화이트'],[/블랙/,'블랙']].forEach(([re,l])=>{ if(re.test(N)&&!feats.includes(l)) feats.push(l); });
+  if(!/[A-Z].*\d|\d.*[A-Z]/i.test(model)||/^(OMEN|삼성|LG|AOC|주연|알파스캔)$/i.test(model)) checks.push({sev:'warn',t:'풀 모델명 확인',d:`${C(model)} — 제품군/브랜드로 보임`});
+  checks.push(size?{sev:'ok',t:'크기 확인',d:esc(size)+'인치'}:{sev:'err',t:'크기 누락',d:'상품명에 크기(예 24인치) 필수'});
+  checks.push(res?{sev:'ok',t:'해상도 확인',d:esc(res)}:{sev:'err',t:'해상도 누락',d:'FHD/QHD/UHD 등 필수'});
+  if(panel){ if(/패널/.test(N)) checks.push({sev:'warn',t:'패널 표기 정규화',d:`${C(panelM[0]+'패널')} → ${C(panel)}`}); } else checks.push({sev:'warn',t:'패널종류 누락',d:'IPS/VA/TN 표기 권장'});
+  if(!form) checks.push({sev:'warn',t:'패널형태 누락',d:'평면/커브드 표기 권장'});
+  if(refresh) checks.push({sev:'ok',t:'주사율 확인',d:esc(refresh)+'Hz'});
+  else if(hzBare) checks.push({sev:'err',t:'주사율 단위 누락',d:`${C(hzBare)} → ${C(hzBare+'Hz')} (단위 없으면 밝기와 혼동)`});
+  else checks.push({sev:'warn',t:'주사율 표기 권장',d:'예 100Hz'});
+  MON_JUNK.forEach(re=>{ const mm=N.match(re); if(mm) checks.push({sev:'warn',t:'상품명 정리 대상',d:`${C(mm[0])} — 중복어/마케팅 문구`}); });
+  [...N.matchAll(/\(([^)]*)\)/g)].forEach(x=>checks.push({sev:'warn',t:'괄호 문구 확인',d:`${C('('+x[1]+')')} — 마케팅 정보면 부가제목으로 이동`}));
+  const fill=[]; const fb=(v,k,l)=>{ if(!v&&F[k]){ fill.push(l); return F[k]; } return v; };
+  const S=fb(size,'size','크기'), FO=fb(form,'form','패널형태'), PA=fb(panel,'panel','패널'), RE=fb(res,'res','해상도');
+  const RF=refresh||hzBare||(F.hz?(fill.push('주사율'),F.hz):null);
+  if(fill.length) checks.push({sev:'ask',t:'표준안에 중요요약 값 반영',d:`상품명에 없는 ${fill.join('·')}을(를) 현재 중요요약설명에서 가져와 표준안에 채움 — 값 확인 후 사용`});
+  const parts=[model, S?S+'인치':'[크기?]']; if(FO) parts.push(FO); parts.push(PA||'[패널?]', RE||'[해상도?]');
+  const rf=RF; if(rf) parts.push(rf+'Hz'); feats.forEach(f=>parts.push(f));
+  return {checks,std:parts.join(' '),category:'monitor'};
+}
+
+/* ---------- 모니터 중요요약 · 정렬·정규화 모드 ----------
+   값은 입력된 것만 사용(생성 없음). 순서 재배열 + 표기 통일 + 누락·모호 항목 플래그 */
+const MON_SLOTS=['type','size','form','panel','res','ratio','hz','resp','bright','contrast','gamut','surface','hdr','sync','pkg','ports','audio','stand','vesa','dims','color','feat'];
+const MON_ORDER=['type','size','form','panel','res','ratio','hz','resp','bright','contrast','gamut','surface','hdr','sync','ports','audio','stand','vesa','feat','dims','color','pkg'];
+const COLORS=/^(블랙|화이트|실버|그레이|스페이스\s*그레이|블루|레드|핑크|베이지|그린|퍼플|화이트\s*블랙)$/;
+function classifyMon(raw){
+  let t=raw.trim(), n=t, changed=false;
+  const set=(v)=>{ if(v!==t) changed=true; n=v; };
+  if(/^\[.*\]$/.test(t)) return {slot:'drop',text:t,changed:true,why:'구분 태그 삭제'};
+  if(/모니터$/.test(t)) return {slot:'type',text:t};
+  if(/cm\s*\(\s*\d+(\.\d+)?\s*인치\s*\)/.test(t)){ set(t.replace(/\s+/g,'')); return {slot:'size',text:n,changed}; }
+  if(/^\d+(\.\d+)?\s*인치$/.test(t)) return {slot:'size',text:t,warn:'cm 병기 권장'};
+  if(/^(평면|커브드|커브|\d{3,4}R(\s*커브드)?)$/.test(t)){ set(t==='커브'?'커브드':t); return {slot:'form',text:n,changed}; }
+  if(/^(IPS|VA|TN|OLED|QD-OLED|WOLED|Fast\s*IPS|나노\s*IPS|IPS\s*Black)(패널)?$/i.test(t)){ set(t.replace(/패널$/,'')); return {slot:'panel',text:n,changed}; }
+  let m;
+  if((m=t.match(/^([A-Z0-9+]{2,6})?\s*\(?\s*(\d{3,4})\s*[x×*X]\s*(\d{3,4})\s*\)?$/))){ set((m[1]?m[1]+'(':'')+m[2]+'x'+m[3]+(m[1]?')':'')); return {slot:'res',text:n,changed}; }
+  if((m=t.match(/^(와이드\s*)?\(?\s*(\d{1,2})\s*:\s*(\d{1,2})\s*\)?$/))){ set(m[2]+':'+m[3]); return {slot:'ratio',text:n,changed}; }
+  if((m=t.match(/^(주사율\s*:?\s*)?(\d{2,3})\s*Hz$/i))){ set(m[2]+'Hz'); return {slot:'hz',text:n,changed}; }
+  if(/응답\s*속도/.test(t)||/^\d+(\.\d+)?\s*ms(\s*\(.*\))?$/i.test(t)){
+    const body=t.replace(/^응답\s*속도\s*:?\s*/,''); set('응답속도:'+body.replace(/\s+(?=ms)/i,''));
+    return {slot:'resp',text:n,changed,unk:/GTG|MPRT/i.test(t)?null:'응답속도 측정 기준(GTG/MPRT) 미기재'}; }
+  if((m=t.match(/^(밝기\s*:?\s*)?(\d{2,4})\s*(nits?|cd\/㎡|cd\/m2|칸델라)$/i))){ set('밝기:'+m[2]+'nit'); return {slot:'bright',text:n,changed}; }
+  if((m=t.match(/^(명암비\s*:?\s*)?([\d,]{3,})\s*:\s*1$/))){ set('명암비:'+m[2].replace(/,/g,'')+':1'); return {slot:'contrast',text:n,changed}; }
+  if((m=t.match(/^(DCI-?P3|sRGB|NTSC|Adobe\s*RGB)\s*:?\s*(\d{2,3}(\.\d+)?\s*%)$/i))){ const k=m[1].toUpperCase()==='DCI-P3'||/dci/i.test(m[1])?'DCI-P3':m[1]; set(k+':'+m[2].replace(/\s/g,'')); return {slot:'gamut',text:n,changed}; }
+  if(/글레어|저반사/.test(t)) return {slot:'surface',text:t};
+  if(/^(HDR|DisplayHDR|VESA\s*DisplayHDR)/i.test(t)) return {slot:'hdr',text:t};
+  if(/FreeSync|G-?SYNC|어댑티브\s*싱크|Adaptive-?Sync/i.test(t)){ set(/^FreeSync/i.test(t)?'AMD '+t:t); return {slot:'sync',text:n,changed}; }
+  if(/무게|두께/.test(t)) return {slot:'dims',text:t};
+  if((m=t.match(/^(약\s*)?(\d+(\.\d+)?)\s*(kg|g)$/i))){ set('무게:'+t.replace(/\s+(?=k?g$)/i,'')); return {slot:'dims',text:n,changed}; }
+  if(/포함$/.test(t)) return {slot:'pkg',text:t};
+  if(/HDMI|\bDP\b|DisplayPort|D-?SUB|DVI|USB|Type-?C|썬더볼트|Thunderbolt/i.test(t)){ set(t.replace(/D-?Sub/i,'D-SUB'));
+    return {slot:'ports',text:n,changed,unk:/x\s*\d|\d\s*개/i.test(t)?null:'단자 수량·버전 미기재'}; }
+  if(/스피커|오디오|헤드폰|이어폰/.test(t)){ set(t.replace(/헤드폰\s*아웃/,'헤드폰 출력').replace(/이어폰\s*아웃/,'이어폰 출력')); return {slot:'audio',text:n,changed}; }
+  if(/^(높낮이|틸트|스위블|피벗)/.test(t)){ set(t.replace(/\((상하|좌우)\)$/,'')); return {slot:'stand',text:n,changed}; }
+  if(/^VESA/i.test(t)){ set(t.replace(/^VESA\s*:?\s*/i,'VESA:').replace(/\s*[x×*]\s*/,'x')); return {slot:'vesa',text:n,changed}; }
+  if(COLORS.test(t)) return {slot:'color',text:t};
+  return {slot:'feat',text:t};
+}
+function normalizeMonSummary(text, name){
+  const toks=text.split('|').map(x=>x.trim()).filter(Boolean);
+  const buckets={}; MON_SLOTS.forEach(k=>buckets[k]=[]);
+  const changes=[], checks=[], dropped=[];
+  toks.forEach(tok=>{
+    const c=classifyMon(tok);
+    if(c.slot==='drop'){ dropped.push(tok); return; }
+    buckets[c.slot].push(c.text);
+    if(c.changed) changes.push([tok,c.text]);
+    if(c.unk) checks.push({sev:'unk',t:c.unk,d:`${C(c.text)} — 공식 사양 확인 후 보완 (추정 기입 금지)`});
+    if(c.warn) checks.push({sev:'warn',t:c.warn,d:C(c.text)});
+  });
+  const out=MON_ORDER.flatMap(k=>buckets[k]).join('|');
+  // 필수 항목
+  [['size','크기'],['panel','패널'],['res','해상도'],['hz','주사율']].forEach(([k,l])=>{ if(!buckets[k].length) checks.push({sev:'err',t:`중요요약 필수 항목 누락 · ${l}`,d:'원본에 값이 없음 → 공식 사양 확인 후 추가'}); });
+  if(!buckets.type.length) checks.push({sev:'warn',t:'유형 항목 없음',d:`맨 앞에 ${C('모니터')} / ${C('게이밍모니터')} / ${C('포터블 모니터')} 등 유형 권장`});
+  // 상품명 ↔ 중요요약 대조
+  const nSize=(name.match(/(\d{2,3})\s*인치/)||[])[1], sSize=((buckets.size[0]||'').match(/\((\d{2,3})(\.\d+)?인치\)/)||[])[1];
+  if(nSize&&sSize&&nSize!==sSize) checks.push({sev:'err',t:'상품명↔중요요약 크기 불일치',d:`상품명 ${C(nSize+'인치')} / 요약 ${C(sSize+'인치')}`});
+  const nHz=(name.match(/(\d{2,3})\s*Hz/i)||[])[1], sHz=((buckets.hz[0]||'').match(/(\d+)/)||[])[1];
+  if(nHz&&sHz&&nHz!==sHz) checks.push({sev:'err',t:'상품명↔중요요약 주사율 불일치',d:`상품명 ${C(nHz+'Hz')} / 요약 ${C(sHz+'Hz')}`});
+  const nRes=MON_RES.find(r=>new RegExp('\\b'+r+'\\b','i').test(name)), sRes=(buckets.res[0]||'').split('(')[0];
+  if(nRes&&sRes&&/^[A-Z]/.test(sRes)&&nRes.toUpperCase()!==sRes.toUpperCase()) checks.push({sev:'err',t:'상품명↔중요요약 해상도 불일치',d:`상품명 ${C(nRes)} / 요약 ${C(sRes)}`});
+  if(dropped.length) changes.push(...dropped.map(d=>[d,'(삭제)']));
+  const reordered = toks.filter(t=>!/^\[.*\]$/.test(t)).length>0 && out!==toks.filter(t=>!/^\[.*\]$/.test(t)).map(t=>classifyMon(t).text).join('|');
+  const pick=k=>buckets[k][0]||null;
+  return {out,changes,checks,reordered,fields:{size:((pick('size')||'').match(/\((\d+(?:\.\d+)?)인치\)/)||[])[1]||null,form:pick('form'),panel:pick('panel'),res:(pick('res')||'').split('(')[0]||null,hz:((pick('hz')||'').match(/\d+/)||[])[0]||null}};
+}
+
+/* =========================================================
+   9. 카테고리 판별 · 실행 · 렌더
+   ========================================================= */
+function detectCategory(I){
+  const t=I.brand+' '+I.name+' '+I.maker+' '+(I.spec||'');
+  if(/cm\s*\(\d+(\.\d+)?인치\)|nit|베젤리스|무결점|인치|모니터|\bVA\b|\bTN\b|FHD|QHD|UHD|커브드|피벗|\d+\s*Hz/i.test(t) && !/Processor/i.test(t)) return 'monitor';
+  return 'cpu';
+}
+const BMAP={err:['b-err','오류'],ask:['b-ask','확인 요청'],warn:['b-warn','경고'],unk:['b-unk','확인불가'],ok:['b-ok','확인']};
+const ORDER={err:0,ask:1,warn:2,unk:3,ok:4};
+function renderChecks(list){
+  list.sort((a,b)=>ORDER[a.sev]-ORDER[b.sev]);
+  return `<div class="checks"><div class="card-h">검증 결과 · ${list.length}건</div>`+
+    list.map(c=>`<div class="chk"><span class="badge ${BMAP[c.sev][0]}">${BMAP[c.sev][1]}</span><div class="body"><div class="t">${esc(c.t)}</div><div class="d">${c.d||''}</div></div></div>`).join('')+`</div>`;
+}
+let COPY={};
+function genRow(key,label,val,naMsg){
+  if(!val) return `<div class="gen-row"><div class="gen-top"><span class="gen-l">${label}</span></div><div class="gen-v na">${naMsg}</div></div>`;
+  COPY[key]=val;
+  return `<div class="gen-row"><div class="gen-top"><span class="gen-l">${label}</span><button class="cp" onclick="cp('${key}',this)">복사</button></div><div class="gen-v">${esc(val)}</div></div>`;
+}
+function cp(key,btn){
+  const t=COPY[key]; if(!t) return;
+  const ok=()=>{btn.textContent='복사됨';btn.classList.add('done');setTimeout(()=>{btn.textContent='복사';btn.classList.remove('done')},1200);};
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(ok).catch(()=>fallbackCopy(t,ok)); else fallbackCopy(t,ok);
+}
+function fallbackCopy(t,ok){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');ok();}catch(e){} ta.remove(); }
+
+function run(){
+  COPY={};
+  const I={maker:v('maker'),brand:v('brand'),name:v('name'),sub:v('sub'),kw:v('kw'),spec:v('spec'),as:v('as'),cooler:v('cooler')};
+  const out=$('out');
+  if(!I.name){ out.innerHTML=renderChecks([{sev:'warn',t:'상품명이 비어 있음',d:'상품명을 입력해 주세요.'}]); return; }
+  const cat=detectCategory(I);
+  let h='';
+  if(cat==='monitor'){
+    const mpre=I.spec?normalizeMonSummary(I.spec,I.name):null;
+    const r=processMonitor(I, mpre&&mpre.fields);
+    h+=`<div class="mode">검증 모드 · 모니터 (표준 상품명 제안)</div>`;
+    h+=`<div class="sec"><span class="num">1</span>상품명 검증</div>`;
+    COPY.std=r.std;
+    h+=`<div class="std"><div class="lab">표준 상품명 제안</div><div class="val">${esc(r.std)}</div><div style="margin-top:10px"><button class="cp" style="background:rgba(255,255,255,.15)" onclick="cp('std',this)">복사</button></div></div>`;
+    h+=renderChecks(r.checks);
+    h+=`<div class="sec"><span class="num">2</span>중요요약설명 · 정렬·정규화</div>`;
+    if(!I.spec){
+      h+=`<div class="gen"><div class="gen-row"><div class="gen-v na">현재 중요요약설명을 붙여넣으면 표준 순서로 정렬하고 표기를 통일합니다. 모니터는 값을 새로 만들지 않습니다.</div></div></div>`;
+    }else{
+      const m=normalizeMonSummary(I.spec,I.name);
+      h+=`<div class="gen">`+genRow('msum','중요요약설명 (정리본)',m.out,'')+`</div>`;
+      const list=[];
+      if(m.reordered) list.push({sev:'warn',t:'항목 순서 재배열',d:'유형 → 크기 → 패널형태 → 패널 → 해상도 → 화면비 → 주사율 → 응답속도 → 밝기 → 명암비 → 색역 → 표면 → HDR → 싱크 → 단자 → 오디오 → 스탠드 → VESA → 부가기능 → 두께·무게 → 색상 → 구성품'});
+      m.changes.forEach(([a,b])=>list.push({sev:'warn',t:'표기 통일',d:`${C(a)} → ${b==='(삭제)'?'삭제 (구분 태그)':C(b)}`}));
+      list.push(...m.checks);
+      if(!list.length) list.push({sev:'ok',t:'표준 형식과 일치',d:'변경 사항 없음'});
+      h+=`<div style="margin-top:14px"></div>`+renderChecks(list);
+    }
+  }else{
+    const r=processCpu(I);
+    h+=`<div class="mode">검증 모드 · CPU (상품명 보존 모드)</div>`;
+    h+=`<div class="sec"><span class="num">1</span>상품명 사실검증</div>`;
+    h+=`<div class="keep">상품명은 현행 형식을 유지합니다: <b>${esc(I.name)}</b><br><span style="color:var(--ink-soft);font-size:12px">'확인 요청' 항목은 상품명 담당 승인 후 수정하세요. CNO는 상품명을 자동으로 고치지 않습니다.</span></div>`;
+    h+=renderChecks(r.checks);
+    h+=`<div class="sec"><span class="num">2</span>필드 생성 · 복사해서 관리자에 붙여넣기</div><div class="gen">`;
+    h+=genRow('brand','브랜드',r.gen.brand,r.isServer?'서버 CPU 브랜드는 현재값 유지 (Intel® Xeon® Gold / Xeon® 6 / Xeon® W / Xeon® E 등)':'티어 판별 불가 — 모델명 확인');
+    h+=genRow('sub','부가제목',r.gen.sub,'서버 CPU 부가제목은 공급 조건(Tray·리드타임·취소 규정)이라 현재값 유지');
+    h+=genRow('kw','키워드',r.gen.kw,'사양 DB 미등록 모델 — 키워드를 추정 생성하지 않음');
+    h+=genRow('sum','중요요약설명',r.gen.sum,'사양 DB 미등록 모델 — 사양값을 만들지 않음 (Truth Protocol). Intel ARK 확인 후 DB에 추가하면 생성됩니다.');
+    h+=`</div>`;
+    if(r.ent){
+      const e=r.ent, g=GEN[e.gen];
+      h+=`<div class="src">사양 출처: Intel 공식 사양(ARK) 기준 · 상태 <b>${e.chk==='ark'?'ARK 개별 확인 완료':'시드값 — 등록 전 ARK 재확인 권장'}</b> · <a href="${arkURL(e.model)}" target="_blank" rel="noopener">Intel에서 ${esc(e.model)} 확인 ↗</a></div>`;
+      h+=`<details><summary>DB 원본 값 보기</summary><table class="tbl">`+
+        [['모델',e.model],['세대/코드네임',`${g.label} / ${g.cn}`],['코어',e.e?`${e.p+e.e} (P${e.p}+E${e.e})`:e.p],['스레드',e.t],['클럭',`P ${e.pb}${e.eb?` / E ${e.eb}`:''} / 최대 ${e.max} GHz`],['캐시',`L2 ${e.l2}MB / L3 ${e.l3}MB`],['전력',`${e.bp}W / ${e.mtp}W`],['메모리',`${e.mem} · 최대 ${g.maxmem}GB`],['내장그래픽',e.gpu||'미탑재']]
+        .map(([a,b])=>`<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')+`</table></details>`;
+    }
+  }
+  h+=`<div class="note"><b>판정 근거.</b> 사양값은 CNO 사양 DB에 등록된 모델만 생성하고, 미등록 모델은 값을 지어내지 않습니다. 코드네임은 DB → 세대 규칙 순으로 판정하며, 규칙 기반 추론(Xeon·코어 울트라 등)은 '확인 권장'으로 표시합니다. 입력값은 브라우저 안에서만 처리되며 어디에도 전송되지 않습니다.</div>`;
+  out.innerHTML=h;
+  out.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* =========================================================
+   10. 예제 (실제 업무에서 나온 오류 유형 재현 · 공개 모델명만)
+   ========================================================= */
+const PRESETS=[
+  ['정상 · 14600K 벌크',{maker:'인텔',brand:'Intel® Core™ i5',name:'14600K (랩터레이크 리프레시) (벌크)',sub:'※ 쿨러 미포함',kw:'14600K,i5-14600K,게이밍,하이엔드,벌크',spec:''}],
+  ['쿨러 충돌 · 12400F',{maker:'인텔',brand:'Intel® Core™ i5',name:'12400F (앨더레이크) (벌크 + RM1쿨러)',sub:'※ 쿨러 미포함 | ※ A/S 3년',kw:'12400F',spec:''}],
+  ['키워드 혼입 · 13500',{maker:'인텔',brand:'Intel® Core™ i5',name:'13500 (랩터레이크) (벌크)',sub:'',kw:'13500,12100F,i3-12100F,가성비,쿨러',spec:''}],
+  ['요약 불일치 · 14700K',{maker:'인텔',brand:'Intel® Core™ i7',name:'14700K (랩터레이크 리프레시) (정품박스)',sub:'',kw:'',spec:'14세대(랩터레이크 리프레시)|소켓:LGA1700|코어:16코어(P8+E8)|스레드:24|L3 캐시:30MB'}],
+  ['쿨러 근거 없음 · 12400',{maker:'인텔',brand:'Intel® Core™ i5',name:'12400 (앨더레이크) (병행수입박스)',sub:'',kw:'',spec:''}],
+  ['코드네임 오기 · 265K',{maker:'인텔',brand:'Intel® Core™ Ultra 7',name:'265K (랩터레이크) (정품박스)',sub:'',kw:'',spec:''}],
+  ['서버 형식 · 6520P',{maker:'인텔',brand:'Intel® Xeon® 6',name:'6520P Processor (24C, 48T, 144M Cache, 2.40GHz)',sub:'※ 쿨러 미포함 | ※ Tray',kw:'',spec:''}],
+  ['서버 코드네임 · 8460Y+',{maker:'인텔',brand:'Intel® Xeon® Platinum',name:'8460Y+ (캐스케이드레이크)',sub:'',kw:'',spec:''}],
+  ['Xeon E · E-2468',{maker:'인텔',brand:'Intel® Xeon® E',name:'E-2468 Processor (8C, 16T, 24M Cache, 2.60 GHz)',sub:'',kw:'',spec:''}],
+  ['DB 미등록 · 10400F',{maker:'인텔',brand:'Intel® Core™ i5',name:'10400F (코멧레이크) (벌크)',sub:'',kw:'',spec:''}],
+  ['모니터 정렬 · 비트엠',{maker:'비트엠',brand:'',name:'Newsync X248VH 베젤리스 화이트 무결점',sub:'',kw:'',spec:'모니터|60.5cm(24인치)|FHD(1920 x 1080)|100Hz|IPS|와이드(16:9)|평면|5ms|300nits|1,000:1|스피커 내장|헤드폰 아웃|틸트(상하)|2.538kg|[게임특화]|블랙 이퀄라이저|조준선 표시|FreeSync|[단자정보]|D-SUB|HDMI'}],
+  ['모니터 표준 · OMEN',{maker:'HP',brand:'',name:'OMEN 27 G2 27인치 평면 IPS FHD 180Hz',sub:'',kw:'',spec:'게이밍모니터|68.6cm(27인치)|평면|IPS|FHD(1920x1080)|16:9|180Hz|응답속도:1ms(GTG)|밝기:400nit|명암비:1000:1|DCI-P3 95%|HDR400|AMD FreeSync|DP 1.4 x1|HDMI 2.0 x2|3.5mm 오디오 출력|높낮이 조절|틸트|피벗|VESA:100x100|HP Eye Ease|무게:약 8.0kg'}],
+  ['모니터 · 삼성',{maker:'삼성전자',brand:'',name:'LS24D304GAKXKR 평면모니터 S30GD 24인치 IPS패널 FHD 주사율100Hz (S24C314 후속모델)',sub:'',kw:'',spec:''}]
+];
+$('presets').innerHTML=PRESETS.map((p,i)=>`<button class="btn btn-ghost" onclick="fill(${i})">${esc(p[0])}</button>`).join('');
+function fill(i){ const p=PRESETS[i][1]; ['maker','brand','name','sub','kw','spec'].forEach(k=>$(k).value=p[k]||''); $('as').value=''; $('cooler').value=''; run(); }
+</script>
