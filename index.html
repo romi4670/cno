@@ -1032,7 +1032,7 @@ function run(){
   const cat=detectCategory(I);
   let g='', src='';
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
-  if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
+  if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:OCR_FIX.bySpec?`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 모델 번호가 깨져 읽혀서, 상품명 괄호의 사양(코어·스레드·캐시·클럭)이 서버 사양 DB의 이 모델과 정확히 같을 때만 제안했습니다. 원본 캡처와 반드시 대조하세요`:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
   if(OCR_NOTE && OCR_KWDROP) extra.push({sev:'warn',t:'인식된 키워드 일부 제외',d:`읽을 수 없는 글자가 섞인 항목 ${OCR_KWDROP}개를 비교에서 제외했습니다. 원본 키워드를 "기존 정보와 비교"에 직접 붙여넣으면 정확히 점검됩니다.`});
   if(cat==='monitor'){
     const mpre=I.spec?normalizeMonSummary(I.spec,I.name):null;
@@ -1106,9 +1106,9 @@ function loadTesseract(){
   return new Promise((res,rej)=>{ const sc=document.createElement('script');
     sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'; sc.onload=res; sc.onerror=()=>rej(new Error('OCR 엔진을 불러오지 못했습니다(네트워크 확인)')); document.head.appendChild(sc); });
 }
-function preprocess(img){
-  // 3배 확대 → 흑백 → 어두운 배경 줄(선택 강조된 상품명) 반전 → 배경 밝게
-  const k=Math.min(3, 3600/Math.max(img.width,1)), w=Math.round(img.width*k), h=Math.round(img.height*k);
+function preprocess(img,kk){
+  // 확대(기본 3배) → 흑백 → 어두운 배경 줄(선택 강조된 상품명) 반전 → 배경 밝게
+  const k=Math.min(kk||3, 3600/Math.max(img.width,1)), w=Math.round(img.width*k), h=Math.round(img.height*k);
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const cx=cv.getContext('2d');
   cx.imageSmoothingQuality='high'; cx.drawImage(img,0,0,w,h);
   const d=cx.getImageData(0,0,w,h), p=d.data;
@@ -1140,17 +1140,37 @@ function parseShotText(text){
   if(!out.name){ const c=lines.find(l=>/\b\d{4,5}[A-Z]{0,2}\b|Processor/.test(l)); if(c) out.name=c; }
   // OCR 교정: 문자 혼동이 확정적인 경우만
   out.name=out.name.replace(/×/g,'X');
+  // 서버 'Processor' 형식: 모델 번호 앞뒤 잡글자 제거 + 모델 번호가 깨졌으면 사양(코어·스레드·캐시·클럭)이 서버 DB의 한 모델과 정확히 같을 때만 그 모델로 제안
+  out.nameOk=true;
+  { const sm=out.name.match(/^(.*?)\bProcessor\s*(\([^)]*?GHz\s*\))/i);
+    if(sm){
+      const SRV=/^([3-9]\d{3}[A-Z]{0,2}\+?|[WE]\d?-\d{4}[A-Z+]*)$/i;
+      let pre=sm[1].trim().split(/\s+/).filter(Boolean).pop()||'';
+      const pre0=pre; pre=pre.replace(/[^A-Za-z0-9+\-]/g,'');
+      let spec=sm[2].replace(/\s+/g,' ').replace(/(\d)\s*GHz/,'$1 GHz');
+      if(!SRV.test(pre)){
+        out.nameOk=false;
+        const q=spec.match(/\(\s*(\d+)\s*C?,\s*(\d+)\s*T?,\s*([\d.]+)\s*M Cache,\s*([\d.]+) GHz/i);
+        if(q && typeof SERVER_DB!=='undefined'){
+          const hit=Object.values(SERVER_DB).filter(e=>e.cores==+q[1]&&e.threads==+q[2]&&e.l3==+q[3]&&Math.abs(e.base-(+q[4]))<0.001);
+          if(hit.length===1){ out.fix={from:pre0,to:hit[0].model,bySpec:true}; pre=hit[0].model; out.nameOk=true; }
+        }
+      }
+      out.name=pre+' Processor '+spec;
+    }
+  }
   // 목록 화면 세로선·괄호 등 앞쪽 잡글자 제거 (모델 번호 앞)
   out.name=out.name.replace(/^[\s|!\[\]{}lI]+(?=\d{3,5}[A-Za-z]?\s)/,'').trim();
   // 서버 형식은 '… GHz)'에서 끝남: 뒤에 붙은 잡글자(예: 선택 영역 가장자리의 '[HI') 제거
   out.name=out.name.replace(/^(\d{4}[0OPEpe]?\s+Processor\s*\([^)]*?GHz\s*\)).+$/i,'$1');
   // 서버 모델 보정: 인텔 서버 모델은 4자리+접미(P·E)이므로, 'Processor' 앞 5자리(끝 0)는 P가 0으로 읽힌 경우로 보고 보정 → 화면에 확인 요청으로 표시
-  out.fix=null;
+  const fixSpec=out.fix||null; out.fix=null;
   const fp=out.name.match(/^(\d{4})([pe])(\s+Processor\b)/);
   if(fp){ out.fix={from:fp[1]+fp[2],to:fp[1]+fp[2].toUpperCase()}; out.name=out.name.replace(/^\d{4}[pe]/,fp[1]+fp[2].toUpperCase()); }
   const fx=out.name.match(/^(\d{4})[0O](\s+Processor\b)/i);
   if(fx){ out.fix={from:fx[1]+'0',to:fx[1]+'P'}; out.name=out.name.replace(/^\d{4}[0O]/,fx[1]+'P'); }
   // 서버 형식 (xC, yT, zM Cache, a.bc GHz): C·T 오인식은 '스레드 = 코어×1 또는 ×2' 정합성이 맞을 때만 교정
+  if(!out.fix && fixSpec) out.fix=fixSpec;
   out.name=out.name.replace(/\((\s*\d+[C6G0O]?)\s*,\s*(\d+[T1lI|7]?)\s*,(\s*[\d.]+M Cache)/i,(m0,a,b,rest)=>{
     const ca=a.trim(), tb=b.trim();
     const cands=[[ca.replace(/[6G0O]$/,''),tb.replace(/[1lI|7]$/,'')],[ca.replace(/C$/i,''),tb.replace(/T$/i,'')]];
@@ -1174,8 +1194,15 @@ async function handleImage(file){
     if(!OCR_WORKER){ OCR_WORKER=await Tesseract.createWorker('kor+eng'); }
     st.textContent='② 글자 인식 중…';
     const img=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=url; });
-    const {data}=await OCR_WORKER.recognize(preprocess(img));
-    const f=parseShotText(data.text);
+    // 서버 상품명의 모델 번호가 깨져 읽히면 배율을 바꿔 다시 인식 (3배 → 4배 → 2배)
+    let data=null, f=null;
+    for(const kk of [3,4,2]){
+      const r=await OCR_WORKER.recognize(preprocess(img,kk)); const pf=parseShotText(r.data.text);
+      if(!data || (pf.name && pf.nameOk && !pf.fix && !(f&&f.nameOk&&!f.fix))){ data=r.data; f=pf; }
+      if(pf.name && pf.nameOk && !pf.fix) break;
+      if(pf.name && !/Processor/i.test(pf.name)) break;   // 서버 형식이 아니면 재시도 불필요
+      st.textContent='② 글자 인식 중… (모델 번호 재확인)';
+    }
     if(!f.name){ throw new Error('상품명을 찾지 못했습니다. 상품명이 보이도록 다시 캡처하거나 직접 입력해 주세요.'); }
     $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value='';
     OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0;
