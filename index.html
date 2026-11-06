@@ -73,7 +73,7 @@
   @media(max-width:860px){.in-grid{grid-template-columns:1fr}}
   .way{display:flex;flex-direction:column;min-width:0}
   .way-lab{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px}
-  .way-lab .n{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border-radius:999px;background:var(--blue-bg);color:var(--blue-ink);font-size:16px;font-weight:800;letter-spacing:.2px}
+  .way-lab .n{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border-radius:999px;background:var(--blue-bg);color:var(--blue-ink);font-size:16px;font-weight:800;letter-spacing:.2px;border:2px solid #f2b400}   /* 노란 윤곽선으로 방법 1·2를 한눈에 구분 */
   .way-lab .h{font-weight:400;color:var(--ink-3)}
   .or{display:none}
   .drop{flex:1;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
@@ -1610,7 +1610,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261107-0010'};
+const BUILD={ver:'v2.1',id:'20261107-0040'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
@@ -1955,6 +1955,10 @@ function run(){
   const I={maker:v('maker'),brand:v('brand'),name:v('name'),sub:v('sub'),kw:v('kw'),spec:v('spec'),as:v('as'),cooler:v('cooler'),ocr:OCR_NOTE};
   let OCR_REPAIR=null;   // 캡처가 깨져 읽은 상품명을 등록 상품명·모델 코드로 보정 (상품명 칸도 같이 고침)
   if(OCR_NOTE && I.name){ OCR_REPAIR=repairOcrNbName(I.name); if(OCR_REPAIR){ I.name=OCR_REPAIR.name; $('name').value=I.name; } }
+  // 앞의 [LG전자]·[삼성전자]·[HP]는 신관리자에서 제조사로 선택하는 값이라 상품명에서 빼고 제조사 칸으로 옮김 (CPU·노트북·완제품 PC)
+  if(I.name){ const c0=detectCategory(I);
+    if(c0==='cpu'||c0==='nb'||c0==='pc'){ const m=I.name.match(/^\s*\[([^\]]{1,12})\]\s*/);
+      if(m && !/PICK|추천|특가|이벤트|단독|신상|할인|NEW|BEST|HOT/i.test(m[1])){ I.name=I.name.slice(m[0].length); if(!I.maker){ I.maker=m[1].trim(); $('maker').value=I.maker; } if(OCR_NOTE) $('name').value=I.name; } } }
   const G=$('gen'), K=$('checksBox'), M=$('mode'), S=$('src');
   if(!I.name){ G.innerHTML=`<div class="gen-row"><div class="gen-v na">캡처를 넣거나 상품명을 입력하면 상품명 · 브랜드 · 부가제목 · 키워드 · 중요요약설명이 여기에 채워집니다.</div></div>`; K.innerHTML=''; M.textContent=''; S.innerHTML=''; setRunState('idle','입력 대기'); return; }
   if(OCR_NOTE && oddCount(I.name)>=2){
