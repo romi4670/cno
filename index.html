@@ -1310,6 +1310,12 @@ function parseNbSpec(spec){
     else if(/^\d+\s*(GB|TB)$/i.test(t)){ if(!S.ssdCap) S.ssdCap=t; else S.others.push(t0); }
     else S.others.push(t0);
   });
+  // 코어 울트라: '(S2)' → '(시리즈2)', CPU 모델 뒤 단일 GHz는 최대 클럭 → '(최대 4.8GHz)'
+  if(S.cpuTier && /울트라/.test(S.cpuTier)){
+    S.cpuTier=S.cpuTier.replace(/\(\s*S(\d)\s*\)/i,'(시리즈$1)');
+    const um=S.cpuTier.match(/울트라\s*(\d)/); if(um && !S.ultraN) S.ultraN=um[1];
+    if(S.cpuModel){ const cm=S.cpuModel.match(/^([A-Za-z0-9\-]+)\s*\(\s*([\d.]+)\s*GHz\s*\)$/); if(cm) S.cpuModel=`${cm[1]} (최대 ${cm[2]}GHz)`; if(S.ultraN) S.cpuModelId=S.cpuModel.replace(/\s*\(.*$/,''); }
+  }
   return S;
 }
 function genNbSummaryFromSpec(S,P,opt){
@@ -1351,22 +1357,28 @@ function genNbKeywordsGeneric(S,P,model,nameRaw){
    - 상품명: 판매처 표현(예: 듀얼업)은 공식 명칭이 아닐 수 있어 그대로 두고 확인 요청 */
 const NB_MAKERS={
   lg:{name:'LG',tag:['LG','엘지'],extraKw:line=>[line&&'LG'+line,'엘지노트북']},
-  samsung:{name:'삼성',tag:['삼성','SAMSUNG'],extraKw:()=>['삼성노트북']}
+  samsung:{name:'삼성',tag:['삼성','SAMSUNG'],extraKw:()=>['삼성노트북']},
+  hp:{name:'HP',tag:['HP','휴렛'],extraKw:line=>[line&&line.replace(/\s/g,''),'HP노트북'],noBase:true,noLine:true,variant:m=>m.replace(/^(\d+-)([A-Za-z]{2})/,(a,b,c)=>b+c.toLowerCase())}
 };
 const NB_MODEL_RE={lg:/^\d{2}[A-Z]{1,2}\d{2,3}[A-Z]?-[A-Z0-9]{4,6}$/, samsung:/^NT\d{3}[A-Z]{2,4}-[A-Z0-9]{3,6}$/};
 function nbMakerOf(I,model){
   const t=(I.maker||'')+' '+I.name+' '+(I.brand||'');
   if(NB_MODEL_RE.samsung.test(model)||/삼성|SAMSUNG/i.test(t)) return 'samsung';
   if(NB_MODEL_RE.lg.test(model)||/\bLG\b|엘지|LG전자/i.test(t)) return 'lg';
+  if(!/빅터스|VICTUS/i.test(I.name) && (/\bHP\b|휴렛/i.test(t)||/^\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}$/.test(model))) return 'hp';   // 빅터스는 기존 등록본 일반화 규칙 유지
   return null;
 }
 /* 제조사 노트북 키워드: 모델명 → 색상코드 뺀 모델명 → 모델 앞부분 → 라인명 → 제조사 노트북어 → CPU → 크기 → 해상도명 → 색상 */
 function genMakerNbKeywords(S,P,model,line,mk,color){
-  const dedupe=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
+  const dedupe=a=>a.filter(Boolean).filter((x,i,b)=>b.indexOf(x)===i);   // 대소문자만 다른 모델 표기(15-FD2136TU / 15-fd2136TU)도 모두 유지
   const kw=[model];
   if(color && /[A-Z]$/.test(model)) kw.push(model.slice(0,-1));   // 모델명 끝 글자가 색상 코드일 수 있어 두 표기 모두 사용
-  kw.push(model.replace(/-.*$/,''), line, ...NB_MAKERS[mk].extraKw(line));
-  if(S.ultraN) kw.push(`울트라${S.ultraN} ${S.cpuModel}`,`코어울트라${S.ultraN}`);
+  const MK=NB_MAKERS[mk];
+  if(MK.variant) kw.push(MK.variant(model));
+  if(!MK.noBase) kw.push(model.replace(/-.*$/,''));
+  if(!MK.noLine) kw.push(line);
+  kw.push(...MK.extraKw(line));
+  if(S.ultraN) kw.push(`울트라${S.ultraN} ${(S.cpuModel||'').replace(/\s*\(.*$/,'')}`.trim(),`코어울트라${S.ultraN}`);
   else{
     if(S.cpuModel) kw.push(S.cpuModel.replace(/\s*\(.*$/,'').trim());
     if(S.cpuTier){ const m=S.cpuTier.match(/^(.*?)[-\s]*(\d+세대)$/); if(m){ kw.push(m[1].replace(/\s/g,''),m[2]); } else kw.push(S.cpuTier.replace(/\([^)]*\)/g,'').replace(/\s/g,'')); }
@@ -1374,14 +1386,17 @@ function genMakerNbKeywords(S,P,model,line,mk,color){
   if(S.inch){ const m=S.inch.match(/\(([\d.]+인치)\)/); if(m) kw.push(m[1]); }
   if(S.res){ const m=S.res.match(/\(([A-Za-z0-9]+)\)/); if(m) kw.push(m[1]); }
   kw.push(color);
+  { const m=(S.os||'').match(/Win\s?(\d+)\s*(Pro|Home|P|H)?\b/i); if(m) kw.push('Win'+m[1]+(/^p/i.test(m[2]||'')?'Pro':/^h/i.test(m[2]||'')?'Home':'')); }   // OS 키워드: Win11Pro
   return dedupe(kw);
 }
 function processNbMaker(I,P,checks,gen,S,model,mk){
   const MK=NB_MAKERS[mk];
   const rest=I.name.replace(/^\s*\[[^\]]+\]\s*/,'').trim(), li=rest.indexOf(model), pre=(li>0?rest.slice(0,li):'').trim().split(/\s+/).filter(Boolean);
   const after=li>=0?rest.slice(li+model.length).trim().split(/\s+/)[0]:'';
-  const color=(after&&!/^[(\[]/.test(after))?after:null;
-  const line=pre[0]||null;
+  const color=(after&&/^[가-힣]{2,}$/.test(after))?after:null;
+  const line=mk==='hp'?(pre.length?('HP '+pre.join(' ')).replace(/^HP HP\b/,'HP'):'HP '+((model.match(/^\d+/)||[''])[0])):(pre[0]||null);   // HP: 시리즈명이 없으면 'HP 15'처럼 화면 크기 계열
+  if(/^win/i.test(P.os||'') && !/^Win/.test(P.os)) { checks.push({sev:'ask',t:'상품명 오타',d:`${C(P.os.match(/^\S+/)[0])} → ${C(P.os.match(/^\S+/)[0].replace(/^win/i,'Win'))}. 나머지 상품명은 노트북 상품명 규칙이 아직 없어 그대로 두었습니다`}); }
+  if(P.os && /^win/i.test(P.os)){ P.os=P.os.replace(/^win/i,'Win'); S.os=P.os; }   // 상품명 OS 구성(예: Win11 Pro DSP 설치)을 중요요약 OS로 사용
   // 이름 뒤 괄호(CPU/RAM/SSD/OS)에서 읽은 값을 입력 사양에 보충
   if(P.cpu && !S.ultraN && !S.cpuModel){ const m=P.cpu.match(/Ultra\s*(\d)[\s-]*(\d{3}[A-Z]?)/i); if(m){ S.cpuMaker='인텔'; S.ultraN=m[1]; S.cpuTier=`코어 울트라${m[1]}(시리즈${m[2][0]})`; S.cpuModel=m[2]; } }
   if(P.ram){ const nr=P.ram.replace(/\s/g,'').toUpperCase(); if(S.ram && S.ram.replace(/\s/g,'').toUpperCase()!==nr) checks.push({sev:'err',t:'램 용량 불일치 · 상품명 ↔ 입력 사양',d:`상품명 ${C(nr)} ↔ 입력 ${C(S.ram+(S.ramOnboard?'(온보드)':''))} — 상품명 값으로 바꿨습니다. 제조사 공식 사양으로 최종 확인하세요`}); S.ram=nr; }
@@ -1390,10 +1405,10 @@ function processNbMaker(I,P,checks,gen,S,model,mk){
   if(!S.color && color) S.color=color;
   gen.brand=line;
   checks.push({sev:'ask',t:`${MK.name} 노트북 · 브랜드는 제품 라인명 제안`,d:line?`${C(line)} — ${MK.name} 노트북 브랜드 표기 기준이 확정되지 않아 모니터처럼 제품 라인명을 제안합니다. 기존 ${MK.name} 노트북 등록본과 맞춰 주세요`:'상품명에서 제품 라인명을 찾지 못해 브랜드를 만들지 않았습니다'});
-  if(pre.length>1) checks.push({sev:'ask',t:'상품명 확인 · 판매처 표현 가능성',d:`${C(pre.slice(1).join(' '))} — ${MK.name} 공식 명칭인지 확인이 필요합니다. 노트북 상품명 규칙이 아직 없어 상품명은 그대로 두었습니다`});
+  if(pre.length>1 && mk!=='hp') checks.push({sev:'ask',t:'상품명 확인 · 판매처 표현 가능성',d:`${C(pre.slice(1).join(' '))} — ${MK.name} 공식 명칭인지 확인이 필요합니다. 노트북 상품명 규칙이 아직 없어 상품명은 그대로 두었습니다`});
   gen.kw=genMakerNbKeywords(S,P,model,line,mk,color).join(',');
   if(color && /[A-Z]$/.test(model)) checks.push({sev:'ask',t:'모델명 끝 글자 확인',d:`${C(model)} / ${C(model.slice(0,-1))} — 끝 ${C(model.slice(-1))}는 색상 코드로 보이지만 확인할 수 없어 두 표기 모두 키워드에 넣었습니다`});
-  checks.push({sev:'warn',t:'키워드 제외 · 포괄어',d:`${C('사무용')} ${C('인강용')} 같은 용도어는 키워드에 넣지 않고 중요요약 ${C('용도')} 항목에 둡니다`});
+  if(S.purpose) checks.push({sev:'warn',t:'키워드 제외 · 포괄어',d:`${C(S.purpose)} 같은 용도어는 키워드에 넣지 않고 중요요약 ${C('용도')} 항목에 둡니다`});
   const sum=genNbSummaryFromSpec(S,P,{ssdSection:true});
   if(sum!=='노트북') gen.sum=sum;
   else checks.push({sev:'unk',t:'중요요약 입력 없음',d:'상품 화면의 사양 줄을 "기존 정보와 비교"의 중요요약에 붙여 넣으면 표준 형식으로 조립합니다. 값을 새로 만들지는 않습니다'});
@@ -2211,10 +2226,11 @@ const PRESETS=[
   ['모니터 · 삼성',{maker:'삼성전자',brand:'',name:'LS24D304GAKXKR 평면모니터 S30GD 24인치 IPS패널 FHD 주사율100Hz (S24C314 후속모델)',sub:'',kw:'',spec:''}],
   ['AMD · 라이젠 7800X3D 멀티팩',{maker:'AMD',brand:'',name:'[AMD] 라이젠7-5세대 7800X3D (라파엘) (멀티팩) / 쿨러미포함',sub:'* 쿨러가 없는 멀티팩 제품 입니다 *',kw:'',spec:'AMD(소켓AM5)|5세대(Zen4)|5nm|8코어|16스레드|기본 클럭:4.2GHz|최대 클럭:5.0GHz|L2 캐시:8MB|L3 캐시:96MB|TDP:120W|PCIe5.0|메모리 규격:DDR5|5200MHz|내장그래픽:탑재|AMD 라데온 그래픽|기술 지원:Ryzen Master,3D V캐시|쿨러:미포함'}],
   ['노트북 · LG 울트라PC',{maker:'LG전자',brand:'',name:'[LG전자] 울트라PC 듀얼업 15UD50T-GX5JK (기본 제품)',sub:'',kw:'',spec:'노트북 / 39.6cm(15.6인치) / 1.7kg / OS미포함(프리도스) / [화면] 해상도 : 1920x1080(FHD) / [CPU] 인텔 / 코어i5-13세대 / i5-1334U (1.3GHz) / [그래픽] 내장그래픽 / UHD Graphics / [구성] 램 : 8GB / 램 교체 : 가능 / 용량 : 256GB / 저장 슬롯 : 2개 / 전원 : USB-PD / 배터리 : 51Wh / 용도 : 사무/인강용'}],
-  ['노트북 · 삼성 갤럭시북5',{maker:'삼성전자',brand:'',name:'[삼성전자] 갤럭시북5 NT750XHW-A51AG 그레이 (Ultra5 225U /16GB /256GB /Non OS) [기본 제품]',sub:'',kw:'',spec:'Ultra 5 225U . LPDDR5x 8GB (온보드) . NVMe 256GB (총 슬롯 2) . 39.6 cm FHD (1920 * 1080) . 운영체제 미포함'}]
+  ['노트북 · 삼성 갤럭시북5',{maker:'삼성전자',brand:'',name:'[삼성전자] 갤럭시북5 NT750XHW-A51AG 그레이 (Ultra5 225U /16GB /256GB /Non OS) [기본 제품]',sub:'',kw:'',spec:'Ultra 5 225U . LPDDR5x 8GB (온보드) . NVMe 256GB (총 슬롯 2) . 39.6 cm FHD (1920 * 1080) . 운영체제 미포함'}],
+  ['노트북 · HP 15',{maker:'HP',brand:'',name:'[HP] 15-FD2136TU + WIn11 Pro DSP 설치',sub:'',kw:'',spec:'노트북 / 39.6cm(15.6인치) / 1.65kg / Win11Pro / [화면] 해상도 : 1920x1080(FHD) / 밝기 : 300nit / [CPU] 인텔 / 코어 울트라5(S2) / 225U (4.8GHz) / NPU : 12TOPS / [그래픽] 내장그래픽 / Intel Graphics / [구성] 램 : 16GB / 램 교체 : 가능 / 용량 : 512GB'}]
 ];
 // 예제: 정상·오류·미등록을 먼저 노출하고 나머지는 펼쳐서 선택
-const FEATURED=[0,1,3,5,9,10,12,13,14,15,16,17,18];
+const FEATURED=[0,1,3,5,9,10,12,13,14,15,16,17,18,19];
 function presetBtn(p,i){ const [t]=p; const parts=t.split(' · '); const kind=parts[0], label=parts[1]||'';
   const isMon=/^모니터/.test(kind), isSet=/^(완제품|노트북|RAM|AMD)/.test(kind);
   const k=isSet?['k-mon',kind]:isMon?['k-mon','모니터']:/^정상/.test(kind)?['k-ok','정상']:/미등록/.test(kind)?['k-unk','미등록']:['k-err','오류 예제'];
