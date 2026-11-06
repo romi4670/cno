@@ -923,7 +923,11 @@ function processMonitor(I,F){
   const checks=[]; const N=I.name.replace(/\s+/g,' ').trim(); const tokens=N.split(' ');
   let model=tokens[0]||'';
   if(!/\d/.test(model) && tokens[1] && /[A-Z]/i.test(tokens[1]) && /\d/.test(tokens[1]) && !/인치|Hz/i.test(tokens[1])) model=model+' '+tokens[1];
-  const sizeM=N.match(/(\d{2,3})\s*인치/)||N.match(/(\d{2,3})\s*"/); const size=sizeM?sizeM[1]:null;
+  // 제품군 단어(에센셜·모니터 등)가 앞에 오면 영문+숫자로 된 모델 코드를 모델명으로 삼고, 앞 단어는 상품명에서 빼고 키워드로 옮김
+  let lead=[]; const looksModel=m=>/[A-Za-z].*\d|\d.*[A-Za-z]/.test(m) && !/^(OMEN|삼성|LG|AOC|주연|알파스캔)$/i.test(m);
+  if(!looksModel(model)){ const ci=tokens.findIndex(t=>/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9\-]{6,}$/.test(t)); if(ci>0){ model=tokens[ci]; lead=tokens.slice(0,ci).filter(t=>!/[A-Za-z0-9]/.test(t)); } }
+  const seriesTok=tokens.filter(t=>t!==model && !model.includes(t) && /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9\-]{4,6}$/.test(t) && !/Hz$/i.test(t) && !/^(USB|HDMI|FHD|QHD|UHD|WQHD|4K|IPS|OLED)/i.test(t));
+  const sizeM=N.match(/(\d{2,3})\s*인치/)||N.match(/(\d{2,3})\s*"/); const cmM=N.match(/(\d{2,3}(?:\.\d+)?)\s*cm/i); const size=sizeM?sizeM[1]:(cmM?String(Math.round(parseFloat(cmM[1])/2.54)):null);
   const form=/커브드|커브|curved/i.test(N)?'커브드':(/평면|flat/i.test(N)?'평면':null);
   const panelM=N.match(/\b(IPS|VA|TN|OLED)\b/i); const panel=panelM?panelM[1].toUpperCase():null;
   const res=MON_RES.find(r=>new RegExp('\\b'+r+'\\b','i').test(N))||null;
@@ -932,7 +936,8 @@ function processMonitor(I,F){
   const feats=[];
   [[/4면\s*보더리스/,'4면보더리스'],[/(?<!4면\s*)보더리스/,'보더리스'],[/높낮이/,'높낮이'],[/USB-?C/i,'USB-C'],[/베젤리스/,'베젤리스'],[/무결점/,'무결점'],[/피벗/,'피벗'],[/화이트/,'화이트'],[/블랙/,'블랙']].forEach(([re,l])=>{ if(re.test(N)&&!feats.includes(l)) feats.push(l); });
   if(!/[A-Z].*\d|\d.*[A-Z]/i.test(model)||/^(OMEN|삼성|LG|AOC|주연|알파스캔)$/i.test(model)) checks.push({sev:'warn',t:'풀 모델명 확인',d:`${C(model)} — 제품군/브랜드로 보임`});
-  checks.push(size?{sev:'ok',t:'크기 확인',d:esc(size)+'인치'}:{sev:'err',t:'크기 누락',d:'상품명에 크기(예 24인치) 필수'});
+  if(lead.length||seriesTok.length) checks.push({sev:'warn',t:'상품명 정리 · 제품군·시리즈는 키워드로',d:`${[...lead,...seriesTok].map(C).join(' ')} — 모델 코드를 맨 앞에 두고 제품군(카테고리 중복어)·시리즈명은 상품명에서 빼 키워드로 옮기는 규칙. 표준안에 반영했으며 담당 승인 후 수정`});
+  checks.push(size?{sev:'ok',t:'크기 확인',d:esc(size)+'인치'+(!sizeM&&cmM?` (상품명 ${esc(cmM[0])} 표기를 인치로 환산)`:'')}:{sev:'err',t:'크기 누락',d:'상품명에 크기(예 24인치) 필수'});
   checks.push(res?{sev:'ok',t:'해상도 확인',d:esc(res)}:{sev:'err',t:'해상도 누락',d:'FHD/QHD/UHD 등 필수'});
   if(panel){ if(/패널/.test(N)) checks.push({sev:'warn',t:'패널 표기 정규화',d:`${C(panelM[0]+'패널')} → ${C(panel)}`}); } else checks.push({sev:'warn',t:'패널종류 누락',d:'IPS/VA/TN 표기 권장'});
   if(!form) checks.push({sev:'warn',t:'패널형태 누락',d:'평면/커브드 표기 권장'});
@@ -945,9 +950,13 @@ function processMonitor(I,F){
   const S=fb(size,'size','크기'), FO=fb(form,'form','패널형태'), PA=fb(panel,'panel','패널'), RE=fb(res,'res','해상도');
   const RF=refresh||hzBare||(F.hz?(fill.push('주사율'),F.hz):null);
   if(fill.length) checks.push({sev:'ask',t:'표준안에 중요요약 값 반영',d:`상품명에 없는 ${fill.join('·')}을(를) 현재 중요요약설명에서 가져와 표준안에 채움 — 값 확인 후 사용`});
+  // 키워드 제안 (모니터 키워드 규칙은 확정 전: 모델 → 시리즈 → 모델 앞부분 → 제조사모니터 → 제품군모니터 → 형태모니터 → 크기모니터 → 패널 → 해상도 → 주사율)
+  const uniq=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
+  const pre=model.replace(/[A-Z]{4,6}$/,''); const mk=(I.maker||'').replace(/(전자|코리아|주식회사|\(주\))$/,'').trim();
+  const kwList=uniq([model.replace(/\s+/g,' '), ...seriesTok, (pre!==model&&pre.length>=6)?pre:null, mk&&mk+'모니터', ...lead.filter(w=>w!=='모니터').map(w=>w+'모니터'), FO==='커브드'?'커브드모니터':null, S?S+'인치모니터':null, PA, RE, (refresh||hzBare||F.hz)?((refresh||hzBare||F.hz)+'Hz'):null]);
   const parts=[model, S?S+'인치':'[크기?]']; if(FO) parts.push(FO); parts.push(PA||'[패널?]', RE||'[해상도?]');
   const rf=RF; if(rf) parts.push(rf+'Hz'); feats.forEach(f=>parts.push(f));
-  return {checks,std:parts.join(' '),category:'monitor'};
+  return {checks,std:parts.join(' '),kw:kwList,category:'monitor'};
 }
 
 /* ---------- 모니터 중요요약 · 정렬·정규화 모드 ----------
@@ -1048,7 +1057,7 @@ function parseSetName(name){
     const rm=N.match(/(\d+)\s*GB\s*구성\s*\(\s*(\d+)\s*\+\s*(\d+)\s*\)/);
     if(rm){ o.ramTotal=+rm[1]; o.ram=(+rm[2]===+rm[3])?`${rm[1]}GB(${rm[2]}GB x2)`:null; }
     const sm=N.match(/SSD\s*(\d+\s*(?:TB|GB))/i); o.ssd=sm?sm[1].replace(/\s/g,'').toUpperCase():null;
-    const om=N.match(/Win\s?\d+[A-Za-z]*(?:\s*DSP\s*설치)?/i); o.os=om?om[0].replace(/^Win\s/i,'Win'):null;
+    const om=N.match(/Win\s?\d+(?:\s*(?:Pro|Home|P|H)\b)?(?:\s*DSP\s*설치)?/i); o.os=om?om[0].replace(/^Win\s/i,'Win'):null;
   }
   [...N.matchAll(/\[([^\]]+)\]/g)].forEach(m=>{ const t=m[1];
     const a=t.match(/(\d+)\s*TB\s*SSD\s*추가|SSD\s*(\d+)\s*TB\s*추가/i); if(a) o.opts.push({k:'ssdAdd',v:+(a[1]||a[2]),t});
@@ -1082,11 +1091,180 @@ function genSetSummary(hw,P){
     '네트워크','무선랜:802.11ax(Wi-Fi 6E)','유선랜:기가비트','영상입출력','HDMI 2.1','DP Alt Mode','웹캠','단자','USB-C:1개','USB-A:2개','SD카드',
     '입력장치','키보드 라이트','ㅗ형 방향키','숫자 키패드(4열)','파워','배터리:70Wh','어댑터:200W','전원:DC','주요제원','두께:23.5mm','무게:2.29kg','쿨링팬:2개','색상:다크실버'].join('|');
 }
+
+/* ---- 노트북 일반화 규칙: 등록본(빅터스 15)의 키워드·중요요약 규칙을 등록본이 없는 모델에도 적용 ----
+   값은 입력한 '현재 중요요약'과 상품명에서만 가져온다. 원본에 없는 항목은 만들지 않는다 (Truth Protocol) */
+function parseNbSpec(spec){
+  const S={std:false,os:null,inch:null,res:null,nit:null,hz:null,cpuMaker:null,cpuTier:null,cpuModel:null,npu:null,gpuKind:null,gpuModel:null,vram:null,ram:null,ramType:null,ramSpeed:null,ramSwap:null,ssdCap:null,ssdType:null,weight:null,others:[]};
+  if(!spec) return S;
+  S.std=/^노트북\|/.test(spec.trim());
+  const toks=spec.split(/\s\/\s|\|/).map(x=>x.trim()).filter(Boolean);
+  const SECT=/^(노트북|화면정보|CPU|램|그래픽|저장장치|네트워크|파워|주요제원|입력장치|단자|영상입출력|웹캠|SD카드)$/;
+  toks.forEach(t0=>{
+    const t=t0.replace(/^\[[^\]]+\]\s*/,'').trim(); if(!t||SECT.test(t)) return;
+    const m=t.match(/^(.+?)\s*:\s*(.+)$/);
+    if(m){ const k=m[1].replace(/\s/g,''), v=m[2].trim();
+      if(/^(운영체제|운영체제\(OS\)|OS)$/i.test(k)) S.os=v;
+      else if(k==='해상도') S.res=v; else if(k==='밝기') S.nit=v; else if(k==='주사율') S.hz=v;
+      else if(/^NPU$/i.test(k)) S.npu=v; else if(k==='램'||k==='램용량') S.ram=v; else if(k==='램교체') S.ramSwap=v;
+      else if(k==='용량') S.ssdCap=v;
+      else if(k==='저장장치'){ if(/^\d+\s*(GB|TB)$/i.test(v)) S.ssdCap=v; else S.ssdType=v; }
+      else if(/^VRAM$/i.test(k)) S.vram=v; else if(k==='무게') S.weight=v;
+      else S.others.push(t0);
+      return; }
+    if(/^\d+(\.\d+)?cm\(.*인치\)$/.test(t)) S.inch=t;
+    else if(/^\d+(\.\d+)?kg$/i.test(t)) S.weight=t;
+    else if(/^Win\s?\d+/i.test(t)) S.os=t;
+    else if(/^\d+x\d+/.test(t)) S.res=t;
+    else if(/^\d+\s*nit$/i.test(t)) S.nit=t;
+    else if(/^\d+\s*Hz$/i.test(t)) S.hz=t;
+    else if(/^(인텔|AMD|퀄컴|Intel)$/i.test(t)) S.cpuMaker=t;
+    else if(/^[A-Za-z0-9\-]+\s*\(\s*[\d.]+\s*GHz\s*\)$/.test(t)) S.cpuModel=t;
+    else if(/(라이젠|코어|울트라|Ryzen|Core|Ultra|스냅드래곤|Snapdragon)/i.test(t) && !/GHz/i.test(t)) S.cpuTier=t;
+    else if(/^(내장그래픽|외장그래픽)$/.test(t)) S.gpuKind=t;
+    else if(/(RTX|GTX|Radeon|Graphics|\bArc\b|\bRX\s?\d)/i.test(t)) S.gpuModel=t;
+    else if(/^DDR\d/i.test(t)) S.ramType=t;
+    else if(/^\d+\s*MHz$/i.test(t)) S.ramSpeed=t;
+    else if(/^\d+\s*(GB|TB)$/i.test(t)){ if(!S.ssdCap) S.ssdCap=t; else S.others.push(t0); }
+    else S.others.push(t0);
+  });
+  return S;
+}
+function genNbSummaryFromSpec(S,P){
+  const os=S.os||P.os, ram=S.ram||(P.ram||null), ssd=S.ssdCap||P.ssd;
+  const out=['노트북'], add=x=>{ if(x) out.push(x); };
+  add(os&&`운영체제(OS):${os}`);
+  if(S.inch||S.res||S.nit||S.hz) out.push('화면정보'); add(S.inch); add(S.res); add(S.nit); add(S.hz&&`주사율:${S.hz}`);
+  if(S.cpuMaker||S.cpuTier||S.cpuModel||S.npu) out.push('CPU'); add(S.cpuMaker); add(S.cpuTier); add(S.cpuModel); add(S.npu&&`NPU:${S.npu}`);
+  if(ram||S.ramType||S.ramSpeed||S.ramSwap) out.push('램'); add(S.ramType); add(ram&&`램 용량:${ram}`); add(S.ramSpeed); add(S.ramSwap&&`램 교체:${S.ramSwap}`);
+  if(S.gpuKind||S.gpuModel||S.vram) out.push('그래픽'); add(S.gpuKind); add(S.gpuModel); add(S.vram&&`VRAM:${S.vram}`);
+  if(ssd||S.ssdType){ out.push('저장장치'+(S.ssdType?':'+S.ssdType:'')); add(ssd); }
+  if(S.weight){ out.push('주요제원'); add(`무게:${S.weight}`); }
+  S.others.forEach(add);
+  return out.join('|');
+}
+function genNbKeywordsGeneric(S,P,model,nameRaw){
+  const dedupe=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
+  const kw=[model];
+  if(/빅터스|VICTUS/i.test(nameRaw)){ const sz=(model.match(/^\d+/)||[''])[0]; kw.push('빅터스'+sz,'빅터스','VICTUS','HP빅터스'); }
+  if(S.cpuTier) kw.push(S.cpuTier.replace(/\([^)]*\)/g,'').replace(/\s/g,''));
+  if(S.cpuModel) kw.push(S.cpuModel.replace(/\s*\(.*$/,'').trim());
+  if(S.gpuModel && /RTX|GTX|\bRX\s?\d|\bArc\b/i.test(S.gpuModel)){ const g=S.gpuModel.replace(/NVIDIA|GeForce/gi,'').replace(/\s/g,''); kw.push(g,g.replace(/^(RTX|GTX|RX)(\d)/i,'$1 $2')); }
+  const ram=P.ramTotal?P.ramTotal+'GB':((S.ram||'').match(/\d+\s*GB/i)||[null])[0], ssd=P.ssd||((S.ssdCap||'').match(/\d+\s*(?:GB|TB)/i)||[null])[0];
+  kw.push(ram&&ram.replace(/\s/g,'').toUpperCase(), ssd&&ssd.replace(/\s/g,'').toUpperCase());
+  const osr=S.os||P.os; if(osr){ const m=osr.match(/Win\s?(\d+)\s*(Pro|Home|P|H)?\b/i); if(m){ const ed=/^p/i.test(m[2]||'')?'Pro':/^h/i.test(m[2]||'')?'Home':''; kw.push('Win'+m[1]+ed); } }
+  return dedupe(kw);
+}
+function processNbGeneric(I,P,checks,gen){
+  const S=parseNbSpec(I.spec), model=P.model;
+  checks.push({sev:'ask',t:'등록본이 없는 노트북 · 빅터스 규칙을 일반화해 적용',d:`${C(model)}는 등록본이 없어, 담당자 등록본(빅터스 15)의 키워드·중요요약 규칙을 따라 만들었습니다. 값은 입력한 현재 중요요약과 상품명에서만 가져왔고 HP 공식 사양과는 대조 전입니다. 등록 전 확인하세요`});
+  gen.kw=genNbKeywordsGeneric(S,P,model,I.name).join(',');
+  if(!I.spec){
+    checks.push({sev:'unk',t:'현재 중요요약이 없음',d:'"기존 정보와 비교"의 중요요약에 현재 값을 붙여 넣으면 표준 형식으로 정리하고 CPU·RAM·SSD 키워드를 추가합니다. 값을 새로 만들지는 않습니다'});
+    return {checks,gen,P,hw:null,key:model};
+  }
+  if(S.std){ checks.push({sev:'ok',t:'중요요약이 이미 표준 형식',d:'노트북|운영체제(OS)|… 형식이라 그대로 두고 키워드만 만들었습니다'}); }
+  else{
+    gen.sum=genNbSummaryFromSpec(S,P);
+    const miss=[]; if(!S.hz) miss.push('주사율'); if(!S.ssdType) miss.push('저장장치 종류'); if(!S.ramType) miss.push('램 종류'); if(!S.gpuModel) miss.push('그래픽'); if(!S.weight) miss.push('무게');
+    checks.push({sev:'warn',t:'표준 형식으로 재배열 · 값은 원본 그대로',d:`원본 중요요약의 항목을 빅터스 등록본 순서(운영체제→화면정보→CPU→램→그래픽→저장장치→주요제원)로 옮겼습니다. 원본에 없는 항목은 만들지 않았습니다${miss.length?': '+miss.map(C).join(' '):''}`});
+    if(S.others.length) checks.push({sev:'warn',t:`표준 위치를 모르는 항목 · ${S.others.length}건`,d:S.others.map(C).join(' ')+' — 끝에 그대로 붙였습니다. 위치를 확인하세요'});
+  }
+  const n=x=>(x||'').replace(/\s/g,'').toUpperCase();
+  if(P.ramTotal && S.ram){ const sr=((S.ram.match(/\d+\s*GB/i)||[''])[0]); if(sr && n(sr)!==P.ramTotal+'GB') checks.push({sev:'err',t:'상품명 RAM ↔ 중요요약 불일치',d:`상품명 ${C(P.ramTotal+'GB')} ↔ 중요요약 ${C(S.ram)}`}); }
+  if(P.ssd && S.ssdCap && n(P.ssd)!==n(S.ssdCap)) checks.push({sev:'err',t:'상품명 SSD ↔ 중요요약 불일치',d:`상품명 ${C(P.ssd)} ↔ 중요요약 ${C(S.ssdCap)}`});
+  return {checks,gen,P,hw:null,key:model};
+}
+
+/* =========================================================
+   RAM (메모리) — 담당자 등록본 2건(데스크탑용 · 서버용)의 중요요약 형식
+   값은 상품명에 있는 것만 사용 (PC5 번호는 속도×8, REG=RDIMM은 규격상 계산). 원본에 없는 항목은 현재 중요요약에서 가져오거나 [확인 필요]
+   ========================================================= */
+function parseRamName(name){
+  const N=(name||'').replace(/\s+/g,' ').trim(); const o={brand:null,type:null,speed:null,pc:null,cl:null,cap:null,count:null,server:false,ecc:false,reg:false,lrdimm:false,desktop:false,notebook:false,part:null,ok:false};
+  const bm=N.match(/^\[([^\]]{1,20})\]/); o.brand=bm?bm[1]:null;
+  const tm=N.match(/DDR\s?([2345])/i); o.type=tm?'DDR'+tm[1]:null;
+  const sp=N.match(/DDR\d-(\d{4})\b/i)||N.match(/\b(\d{4})\s*MHz/i)||N.match(/-\s*(\d{4})\s*$/);
+  const pc=N.match(/PC\d-(\d{5})/i)||N.match(/-\s*(\d{5})\s*$/);
+  if(sp) o.speed=+sp[1]; if(pc) o.pc=+pc[1];
+  if(!o.speed && o.pc) o.speed=Math.round(o.pc/8); if(!o.pc && o.speed) o.pc=o.speed*8;
+  const cl=N.match(/\bCL\s?(\d{2})\b/i); o.cl=cl?+cl[1]:null;
+  const cm=N.match(/(\d+)\s*GB/i); o.cap=cm?+cm[1]:null;
+  const k=N.match(/\(\s*(\d+)\s*GB\s*[xX*]\s*(\d)\s*\)/)||N.match(/(\d)\s*[xX]\s*(\d+)\s*GB/);
+  if(k){ if(/GB\s*[xX*]/.test(k[0])){ o.cap=+k[1]*+k[2]; o.count=+k[2]; } else { o.cap=+k[1]*+k[2]; o.count=+k[1]; } }
+  else if(o.cap) o.count=1;
+  o.server=/서버용|\bREG\b|RDIMM|LRDIMM/i.test(N); o.ecc=/ECC/i.test(N); o.reg=/\bREG\b|RDIMM/i.test(N); o.lrdimm=/LRDIMM/i.test(N);
+  o.desktop=/데스크탑|데스크톱/.test(N); o.notebook=/노트북|SO-?DIMM/i.test(N);
+  const pn=N.split(' ').find(t=>/^(?=.*[A-Za-z])(?=.*\d)[A-Z0-9][A-Z0-9\-]{9,}$/.test(t)&&!/^DDR|^PC\d/i.test(t)); o.part=pn||null;
+  o.ok=!!(o.type&&o.speed);
+  return o;
+}
+function genRamSummary(R,spec){
+  const toks=(spec||'').split('|').map(x=>x.trim()).filter(Boolean);
+  const carry=re=>toks.find(t=>re.test(t))||null;
+  const sp=`${R.speed}MHz (PC${R.type.slice(3)}-${R.pc})`;
+  const miss=[];
+  if(R.server){
+    const mod=R.lrdimm?'LRDIMM':(R.reg?'RDIMM':'UDIMM');
+    return {sum:['서버용',R.type,sp,R.ecc&&'ECC',R.reg&&'REG',R.brand&&R.cap?`모듈제조사:${R.brand} ${mod} ${R.cap}GB`:null].filter(Boolean).join('|'),miss};
+  }
+  const timing=carry(/^램타이밍:/), volt=carry(/^\d\.\d+V$/), heat=carry(/^히트싱크:/);
+  if(!timing){ miss.push('램타이밍 상세'); } if(!volt) miss.push('전압'); if(!heat) miss.push('히트싱크');
+  const out=[R.notebook?'노트북용':'데스크탑용',R.type,sp,
+    timing||(R.cl?`램타이밍:CL${R.cl}-[확인 필요]`:null), volt||'[전압 확인 필요]',
+    R.count?`램개수:${R.count}개`:null, R.type==='DDR5'?'온다이ECC':null, heat||'히트싱크:[확인 필요]'].filter(Boolean);
+  return {sum:out.join('|'),miss};
+}
+function genRamKeywords(R){
+  const u=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
+  return u([R.part,R.brand,R.type,R.type+'-'+R.speed,'PC'+R.type.slice(3)+'-'+R.pc,R.cap?R.cap+'GB':null,R.cl?'CL'+R.cl:null,R.ecc?'ECC':null,R.reg?(R.lrdimm?'LRDIMM':'RDIMM'):null]);
+}
+function processRam(I){
+  const checks=[], gen={brand:null,kw:null,sum:null}, R=parseRamName(I.name);
+  if(!R.ok){ checks.push({sev:'unk',t:'메모리 규격을 읽지 못함',d:'상품명에서 DDR 세대와 속도를 찾지 못해 키워드·중요요약을 만들지 않음'}); return {checks,gen,R}; }
+  if(R.brand) gen.brand=R.brand;
+  else checks.push({sev:'unk',t:'브랜드 확인불가',d:'상품명 앞의 [브랜드] 표기가 없어 브랜드를 만들지 않음'});
+  // 속도 ↔ PC 번호 일관성
+  const pcN=(I.name.match(/PC\d-(\d{5})/i)||I.name.match(/-\s*(\d{5})\s*$/)||[])[1], spN=(I.name.match(/DDR\d-(\d{4})\b/i)||I.name.match(/\b(\d{4})\s*MHz/i)||I.name.match(/-\s*(\d{4})\s*$/)||[])[1];
+  if(pcN && spN && +pcN!==+spN*8) checks.push({sev:'err',t:'속도 ↔ PC 번호 불일치',d:`${C(spN+'MHz')} ↔ ${C('PC'+R.type.slice(3)+'-'+pcN)} — 속도×8이 PC 번호(${spN*8})와 달라야 할 이유가 없음`});
+  else checks.push({sev:'ok',t:'속도 ↔ PC 번호 일치',d:`${C(R.speed+'MHz')} ↔ ${C('PC'+R.type.slice(3)+'-'+R.pc)}`});
+  if(R.server && R.type==='DDR5' && R.desktop) checks.push({sev:'err',t:'서버용·데스크탑 표기 충돌',d:'상품명에 서버용(ECC/REG)과 데스크탑이 함께 있음'});
+  if(R.server && !R.brand) checks.push({sev:'ask',t:'모듈제조사 확인 필요',d:'서버용 중요요약의 모듈제조사 항목을 만들 수 없음'});
+  if(!R.server && !R.desktop && !R.notebook) checks.push({sev:'ask',t:'용도 확인 필요',d:'데스크탑/노트북/서버 표기가 없어 중요요약 첫 항목(용도)을 데스크탑용으로 가정함'});
+  const g=genRamSummary(R,I.spec); gen.sum=g.sum; gen.kw=genRamKeywords(R).join(',');
+  if(g.miss.length) checks.push({sev:'ask',t:`원본에 없는 항목 · ${g.miss.length}건`,d:`${g.miss.map(C).join(' ')} — 상품명에 없어 만들지 않고 [확인 필요]로 표시. 현재 중요요약을 붙여 넣으면 해당 값을 가져옵니다`});
+  if(I.spec && I.spec.includes('|')){
+    const df=diffSummary(I.spec,gen.sum);
+    if(df.sameSet&&df.sameOrder) checks.push({sev:'ok',t:'중요요약 현재값 일치',d:'현재 등록값과 생성값이 글자 단위로 같음'});
+    else{ if(df.onlyCur.length) checks.push({sev:'warn',t:`중요요약 현재값에만 있는 항목 · ${df.onlyCur.length}건`,d:df.onlyCur.slice(0,8).map(C).join(' ')}); if(df.onlyGen.length) checks.push({sev:'warn',t:`중요요약 생성값에만 있는 항목 · ${df.onlyGen.length}건`,d:df.onlyGen.slice(0,8).map(C).join(' ')}); if(df.sameSet&&!df.sameOrder) checks.push({sev:'warn',t:'중요요약 항목 순서 차이',d:'항목은 같고 순서만 다름'}); }
+  }
+  if(I.kw){ const n=x=>x.toLowerCase().replace(/\s/g,''); const old=I.kw.split(',').map(x=>x.trim()).filter(Boolean), kws=gen.kw.split(',');
+    const oo=old.filter(o=>!kws.some(k=>n(k)===n(o))), gg=kws.filter(k=>!old.some(o=>n(o)===n(k)));
+    if(!oo.length&&!gg.length) checks.push({sev:'ok',t:'키워드 현재값 일치',d:'현재 등록값과 제안값의 항목이 같음'});
+    else{ if(oo.length) checks.push({sev:'warn',t:`키워드 현재값에만 있는 항목 · ${oo.length}건`,d:oo.map(C).join(' ')}); if(gg.length) checks.push({sev:'warn',t:`키워드 제안에만 있는 항목 · ${gg.length}건`,d:gg.map(C).join(' ')}); } }
+  checks.push({sev:'ask',t:'RAM 키워드는 규칙 확정 전 제안',d:'파트 번호 → 브랜드 → DDR 세대 → DDR세대-속도 → PC 번호 → 용량 → CL → ECC·RDIMM 순서입니다. 브랜드 한글·영문 표기와 제조사명은 상품명에 없어 넣지 않았습니다. 등록 전 확인하세요'});
+  return {checks,gen,R};
+}
+/* 완제품 PC 일반화: 등록본이 없는 모델도 키워드만 같은 규칙으로 (중요요약은 등록본이 없어 만들지 않음) */
+function processPcGeneric(I,P,checks,gen){
+  const u=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
+  const N=(I.name||'').replace(/^\s*\[[^\]]{1,12}\]\s*/,'').replace(/\s+/g,' ').trim(); const mi=N.indexOf(P.model);
+  const series=mi>0?N.slice(0,mi).trim():'';
+  const gaming=/OMEN|게이밍|GAMING|LEGION|ROG/i.test(series+' '+I.name);
+  const cpuKw=P.cpu?P.cpu.replace(/^(Core\s*)?Ultra\s*\d[-\s]*/i,'').trim():null, gpuKw=P.gpu?P.gpu.replace(/\s/g,''):null;
+  const mk=(I.maker||'').trim()||'HP';
+  gen.kw=u([P.model, series, series.replace(/^HyperX\s+/i,''), cpuKw, gpuKw, gaming?mk+'게이밍PC':null, mk+'데스크탑', gaming?'게이밍데스크탑':null]).join(',');
+  checks.push({sev:'ask',t:'등록본이 없는 완제품 · OMEN 규칙을 일반화해 적용',d:`${C(P.model)}는 등록본이 없어 상품명에서 읽은 값(시리즈·CPU·GPU)으로만 키워드를 만들었습니다. 한글 표기(예: 오멘35L)는 상품명에 없어 넣지 않았고, 중요요약은 만들지 않습니다. 등록 전 확인하세요`});
+  checks.push({sev:'unk',t:'완제품 중요요약은 만들지 않음',d:'섀시·포트·파워 같은 사양은 상품명에 없고 등록본(OMEN 35L)에만 있어 이 모델에는 적용할 수 없음 (Truth Protocol)'});
+  return {checks,gen,P,hw:null,key:P.model};
+}
 function processSet(I,cat){
   const checks=[], gen={brand:null,kw:null,sum:null}, P=parseSetName(I.name);
   const key=P.model?Object.keys(SET_HW).find(k=>k.toUpperCase()===P.model.toUpperCase()):null, hw=key?SET_HW[key]:null;
   const label=cat==='pc'?'완제품 PC':'노트북';
   if(!P.model){ checks.push({sev:'unk',t:'모델 코드를 찾지 못함',d:`${label} 상품명에서 모델 코드(예: GT18-0000KR · 15-fb2055AX)를 읽지 못해 키워드·중요요약을 만들지 않음`}); return {checks,gen,P,hw,key}; }
+  if(!hw && cat==='nb'){ return processNbGeneric(I,P,checks,gen); }
+  if(!hw && cat==='pc'){ return processPcGeneric(I,P,checks,gen); }
   if(!hw){ checks.push({sev:'unk',t:`${label} 규칙 미등록 모델`,d:`${C(P.model)} — 담당자 등록본 기준 규칙이 없어 키워드·중요요약을 만들지 않음 (Truth Protocol). 등록본 1건을 기준으로 추가하면 생성됩니다`}); return {checks,gen,P,hw,key}; }
   // 상품명에서 읽은 CPU·GPU가 등록 사양과 같은지
   if(hw.cat==='pc'){
@@ -1145,6 +1323,7 @@ function processSet(I,cat){
 function nameSymbolCheck(name,cat){
   let t=(name||'').replace(/^\s*\[[^\]]{1,12}\]\s*/,'');
   if(cat==='pc') t=t.replace(/\([^()]*\)/g,m=>m.replace(/\//g,' ')).replace(/\[[^\]]*\]/g,m=>m.slice(1,-1)).replace(/(\d)\*(\d)/g,'$1$2'); // 등록 형식: (CPU/GPU/RAM/SSD/OS) [옵션]
+  if(cat==='ram') t=t.replace(/ECC\/REG/gi,'ECC REG');
   if(cat==='nb') t=t.replace(/\+/g,' ');                                                                                  // 등록 형식: 구성을 + 로 연결
   const found={}; (t.match(/[^A-Za-z0-9가-힣\s().,+\-®™%]/g)||[]).forEach(c=>{ found[c]=(found[c]||0)+1; });
   const syms=Object.entries(found); if(!syms.length) return null;
@@ -1157,6 +1336,7 @@ function detectCategory(I){
   // 완제품 PC: 상품명 괄호에 'CPU/GPU/RAM/SSD/OS' 구성, 노트북: 시리즈명·모델 코드
   if(/\(([^()]*\/){2,}[^()]*(?:\)|$)/.test(I.name) && /RTX|GTX|\bRX\s?\d{3,4}/i.test(I.name) && !/Processor/i.test(I.name)) return 'pc';
   if(/빅터스|VICTUS|옴니북|파빌리온|노트북/i.test(I.name) || /(?:^|[\s\]])\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}\b/.test(I.name)) return 'nb';
+  if(/DDR\s?[2345]/i.test(I.name) && /\d+\s*GB/i.test(I.name) && !/Processor/i.test(I.name)) return 'ram';
   const t=I.brand+' '+I.name+' '+I.maker;
   const cpuHint=/Processor|XEON|제온|인텔|INTEL|코어|CORE|ULTRA|울트라|라이젠|RYZEN|EPYC|펜티엄|셀러론|랩터레이크|앨더레이크|애로우레이크|\b\d{4,5}[A-Z]{0,3}\s*\(/i.test(t);
   const monHint=/cm\s*\(\d+(\.\d+)?인치\)|nit|베젤리스|무결점|인치|모니터|\bVA\b|\bTN\b|\bIPS\b|\bOLED\b|\bFHD\b|\bQHD\b|\bUHD\b|커브드|피벗|\d+\s*Hz/i.test(t);
@@ -1199,6 +1379,7 @@ function run(){
   let g='', src='';
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
   if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:OCR_FIX.bySpec?`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 모델 번호가 깨져 읽혀서, 상품명 괄호의 사양(코어·스레드·캐시·클럭)이 서버 사양 DB의 이 모델과 정확히 같을 때만 제안했습니다. 원본 캡처와 반드시 대조하세요`:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
+  if(OCR_NOTE && OCR_SPEC && I.spec) extra.push({sev:'ask',t:'캡처에서 읽은 중요요약 사용',d:'작은 글씨라 숫자·모델명이 틀리게 읽힐 수 있습니다(예: 225U). 원본과 반드시 대조하거나, 구관리자의 중요요약을 복사해 "기존 정보와 비교"에 붙여 넣으세요.'});
   if(OCR_NOTE && OCR_KWDROP) extra.push({sev:'warn',t:'인식된 키워드 일부 제외',d:`읽을 수 없는 글자가 섞인 항목 ${OCR_KWDROP}개를 비교에서 제외했습니다. 원본 키워드를 "기존 정보와 비교"에 직접 붙여넣으면 정확히 점검됩니다.`});
   if(cat==='monitor'){
     const mpre=I.spec?normalizeMonSummary(I.spec,I.name):null;
@@ -1207,6 +1388,12 @@ function run(){
     g+=genRow('std','상품명 · 표준 제안',r.std,'',r.std.includes('?')?['ask','누락 항목 있음']:['ok','규격 적용']);
     let list=[...extra,...r.checks]; if(symChk) list.push(symChk);
     g+=NAME_NOTE;
+    g+=genRow('mkw','키워드',r.kw.join(','),'',['ask','제안 · 규칙 확정 전']);
+    if(I.kw){ const n=x=>x.toLowerCase().replace(/\s/g,''); const old=I.kw.split(',').map(x=>x.trim()).filter(Boolean);
+      const oo=old.filter(o=>!r.kw.some(k=>n(k)===n(o))), gg=r.kw.filter(k=>!old.some(o=>n(o)===n(k)));
+      if(!oo.length&&!gg.length) list.push({sev:'ok',t:'키워드 현재값 일치',d:'현재 등록값과 제안값의 항목이 같음'});
+      else{ if(oo.length) list.push({sev:'warn',t:`키워드 현재값에만 있는 항목 · ${oo.length}건`,d:oo.map(C).join(' ')}); if(gg.length) list.push({sev:'warn',t:`키워드 제안에만 있는 항목 · ${gg.length}건`,d:gg.map(C).join(' ')}); } }
+    list.push({sev:'ask',t:'모니터 키워드는 규칙 확정 전 제안',d:'모델 코드 → 시리즈 → 모델 앞부분 → 제조사모니터 → 제품군모니터 → 형태모니터 → 크기모니터 → 패널 → 해상도 → 주사율 순서입니다. 패널·해상도·주사율은 상품명 또는 현재 중요요약에 있을 때만 넣습니다. 등록 전 확인하세요'});
     if(mpre){
       g+=genRow('msum','중요요약설명 · 정리본',mpre.out,'',['ok','순서·표기 통일']);
       if(mpre.reordered) list.push({sev:'warn',t:'중요요약 항목 순서 재배열',d:'유형 → 크기 → 패널형태 → 패널 → 해상도 → 화면비 → 주사율 → 응답속도 → 밝기 → 명암비 → 색역 → 표면 → HDR → 싱크 → 단자 → 오디오 → 스탠드 → VESA → 부가기능 → 두께·무게 → 색상 → 구성품'});
@@ -1216,6 +1403,17 @@ function run(){
       g+=genRow('msum','중요요약설명','', '현재 중요요약설명을 아래 "현재 등록값 대조"에 붙여넣으면 표준 순서로 정렬합니다. 모니터는 값을 새로 만들지 않습니다.',['unk','입력 필요']);
     }
     K.innerHTML=renderChecks(list);
+  }else if(cat==='ram'){
+    const r=processRam(I);
+    M.textContent='검증 모드 · RAM (담당자 등록본 형식 · 상품명 보존)';
+    if(symChk) r.checks.push(symChk);
+    g+=genRow('name','상품명',I.name,'',r.checks.some(c=>c.sev==='ask'||c.sev==='err')?['ask','확인 요청 있음']:['ok','현행 유지']);
+    g+=NAME_NOTE;
+    g+=genRow('brand','브랜드',r.gen.brand,'상품명에 [브랜드]가 없어 만들지 않음',r.gen.brand?['ask','상품명 기준 · 확인 요청']:['unk','확인불가']);
+    g+=genRow('sub','부가제목','','이 카테고리는 부가제목을 만들지 않음 — 현재값 유지',['unk','현재값 유지']);
+    g+=genRow('kw','키워드',r.gen.kw,'규격을 읽지 못해 키워드를 만들지 않음',r.gen.kw?['ask','제안 · 규칙 확정 전']:['unk','생성 안 함']);
+    g+=genRow('sum','중요요약설명',r.gen.sum,'규격을 읽지 못해 중요요약을 만들지 않음',r.gen.sum?(/확인 필요\]/.test(r.gen.sum)?['ask','일부 확인 필요']:['ok','상품명 기반 · 등록본 형식']):['unk','생성 안 함']);
+    K.innerHTML=renderChecks([...extra,...r.checks]);
   }else if(cat==='pc'||cat==='nb'){
     const r=processSet(I,cat);
     M.textContent=`검증 모드 · ${cat==='pc'?'완제품 PC':'노트북'} (담당자 등록본 기준 · 상품명 보존)`;
@@ -1223,10 +1421,10 @@ function run(){
     const bad=r.checks.some(c=>c.sev==='ask'||c.sev==='err');
     g+=genRow('name','상품명',I.name,'',bad?['ask','확인 요청 있음']:['ok','현행 유지']);
     g+=NAME_NOTE;
-    g+=genRow('brand','브랜드',r.gen.brand,'규칙 미등록 모델 — 브랜드를 만들지 않음',r.gen.brand?['ok','등록본 기준']:['unk','규칙 미등록']);
+    g+=genRow('brand','브랜드',r.gen.brand,'규칙 미등록 모델 — 브랜드를 만들지 않음 (현재값 유지)',r.gen.brand?['ok','등록본 기준']:['unk','현재값 유지']);
     g+=genRow('sub','부가제목','','이 카테고리는 부가제목을 만들지 않음 — 현재값 유지',['unk','현재값 유지']);
     g+=genRow('kw','키워드',r.gen.kw,'규칙 미등록이거나 상품명 구성을 읽지 못해 키워드를 만들지 않음',r.gen.kw?['ask','담당자 규칙 · 등록 전 확인']:['unk','생성 안 함']);
-    g+=genRow('sum','중요요약설명',r.gen.sum,'규칙 미등록이거나 상품명 구성을 읽지 못해 사양값을 만들지 않음 (Truth Protocol)',r.gen.sum?['ask','HP 공식 대조 전 · 등록 전 확인']:['unk','생성 안 함']);
+    g+=genRow('sum','중요요약설명',r.gen.sum,'규칙 미등록이거나 상품명 구성을 읽지 못해, 또는 현재 중요요약이 없어 사양값을 만들지 않음 (Truth Protocol)',r.gen.sum?['ask','HP 공식 대조 전 · 등록 전 확인']:['unk','생성 안 함']);
     K.innerHTML=renderChecks([...extra,...r.checks]);
   }else{
     const r=processCpu(I);
@@ -1271,9 +1469,9 @@ function run(){
   else setRunState('done','결과 완료');
 }
 function setRunState(kind,text){ const el=$('runState'); if(!el) return; el.className='state st-'+kind; el.textContent=text; }
-let T_RUN=null, OCR_NOTE=false, OCR_FIX=null, OCR_KWDROP=0;
+let T_RUN=null, OCR_NOTE=false, OCR_FIX=null, OCR_KWDROP=0, OCR_SPEC=false;
 $('name').addEventListener('input',()=>{ OCR_NOTE=false; OCR_FIX=null; OCR_KWDROP=0; clearTimeout(T_RUN); T_RUN=setTimeout(run,350); });
-['maker','brand','sub','kw','spec'].forEach(id=>$(id).addEventListener('input',()=>{ clearTimeout(T_RUN); T_RUN=setTimeout(run,350); }));
+['maker','brand','sub','kw','spec'].forEach(id=>$(id).addEventListener('input',()=>{ if(id==='spec') OCR_SPEC=false; clearTimeout(T_RUN); T_RUN=setTimeout(run,350); }));
 ['as','cooler'].forEach(id=>$(id).addEventListener('change',run));
 
 /* =========================================================
@@ -1332,15 +1530,20 @@ function parseShotText(text){
   if(iN>=0 || iB>=0){ // 관리자 상품정보 화면
     if(iM>=0) out.maker=after(lines[iM]).replace(/[|]/g,'').trim();
     if(iB>=0) out.brand=after(lines[iB]).replace(/코어\s*[|lI1!](\d)/,'코어i$1').trim();
-    if(iN>=0){ const same=after(lines[iN]); out.name=(same&&!/상품명/.test(same))?same:(lines[iN+1]||''); }
+    if(iN>=0){ const same=after(lines[iN]); let cand=(same&&!/상품명/.test(same))?same:(lines[iN+1]||'');
+      if(/^(제조사|브랜드|부가제목|키워드|이벤트|상품정보)/.test(cand.trim())) cand='';   // 다음 칸 제목을 상품명으로 읽지 않음 (강조된 줄을 못 읽은 경우)
+      out.name=cand; }
     if(iS>=0){ const end=iK>=0?iK:lines.length; out.sub=lines.slice(iS+1,end).filter(l=>/[※\[]/.test(l)).join(' | '); }
     if(iK>=0){ const same=after(lines[iK]); out.kw=(same&&!/키워드/.test(same))?same:(lines[iK+1]&&!/이벤트/.test(lines[iK+1])?lines[iK+1]:''); }
   }else{ // 상품 목록 화면: [제조사] 상품명 / ※ 부가제목
     const iL=idx(/\[[^\]]{1,12}\]\s*\S/);
     if(iL>=0){ const m=lines[iL].match(/\[([^\]]{1,12})\]\s*(.+)$/); out.maker=m[1]; out.name=m[2]; }
     const iX=lines.findIndex((l,i)=>i>iL && /※/.test(l)); if(iX>=0) out.sub=lines[iX];
+    // 목록 화면의 중요요약(노트북 등): 제목 다음 줄부터 '업체직발송·택배마감' 앞까지. 작은 글씨라 인식 오류 가능 → 화면에서 확인 요청
+    if(iL>=0){ const sp=[]; for(let i=iL+1;i<lines.length;i++){ if(/업체\s*직발송|무료\s*배송|택배\s*마감|해당\s*제품은|^MP\d{8,}/.test(lines[i])) break; if(/※/.test(lines[i])) continue; sp.push(lines[i]); }
+      const sj=sp.join(' ').trim(); if(/^노트북(\s|\/|\|)/.test(sj) || (sj.match(/\|/g)||[]).length>=5) out.spec=sj; }
   }
-  if(!out.name){ const c=lines.find(l=>/\b\d{4,5}[A-Z]{0,2}\b|Processor/.test(l)); if(c) out.name=c; }
+  if(!out.name && iN<0){ const c=lines.find(l=>/\b\d{4,5}[A-Z]{0,2}\b|Processor/.test(l) && !/제조사|브랜드|부가제목|키워드|이벤트/.test(l)); if(c) out.name=c; }
   // OCR 교정: 문자 혼동이 확정적인 경우만
   out.name=out.name.replace(/×/g,'X');
   // 서버 'Processor' 형식: 모델 번호 앞뒤 잡글자 제거 + 모델 번호가 깨졌으면 사양(코어·스레드·캐시·클럭)이 서버 DB의 한 모델과 정확히 같을 때만 그 모델로 제안
@@ -1398,25 +1601,26 @@ async function handleImage(file){
     st.textContent='② 글자 인식 중…';
     const img=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=url; });
     // 상품명이 깨져 읽히면 배율을 바꿔 다시 인식 (3배 → 4배 → 2배), 그래도 깨지면 강조된 줄만 잘라 한 줄 모드로 인식
-    let best=null;
+    let best=null; const tries=[];
     for(const kk of [3,4,2]){
       const cv=preprocess(img,kk); const r=await OCR_WORKER.recognize(cv); const pf=parseShotText(r.data.text);
-      const sc=nameScore(pf);
+      const sc=nameScore(pf); tries.push({cv,sc});
       if(!best || sc<best.sc) best={data:r.data,f:pf,sc,cv};
       if(sc===0) break;
       st.textContent='② 글자 인식 중… (다시 확인)';
     }
-    if(best.sc>=3 && best.cv._bands && best.cv._bands.length){
+    if(best.sc>=3){
       st.textContent='② 상품명 줄만 다시 인식 중…';
-      for(const b of best.cv._bands.slice(0,3)){
-        try{ const t=await readBand(best.cv,b); if(!t) continue; const f2=parseShotText('상품명 :\n'+t); const sc2=nameScore(f2);
+      const jobs=[]; tries.slice().sort((a,b)=>a.sc-b.sc).slice(0,2).forEach(tr=>{ (tr.cv._bands||[]).slice(0,2).forEach(b=>jobs.push([tr.cv,b])); });
+      for(const [bcv,b] of jobs){
+        try{ const t=await readBand(bcv,b); if(!t) continue; const f2=parseShotText('상품명 :\n'+t); const sc2=nameScore(f2);
           if(f2.name && sc2<best.sc){ best.f=Object.assign({},best.f,{name:f2.name,fix:f2.fix,nameOk:f2.nameOk}); best.sc=sc2; } }catch(e){}
       }
     }
     const data=best.data, f=best.f;
     if(!f.name){ throw new Error('상품명을 찾지 못했습니다. 상품명이 보이도록 다시 캡처하거나 직접 입력해 주세요.'); }
-    $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value='';
-    OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0;
+    $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value=f.spec||'';
+    OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0; OCR_SPEC=!!f.spec;
     if(oddCount(f.name)>=2){ st.className='ocr-st bad'; st.textContent='⚠ 상품명을 제대로 읽지 못했습니다. 상품명 칸을 원본대로 고쳐 주세요.'; }
     else{ st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (신뢰도 ${Math.round(data.confidence)}%) — 상품명 칸을 원본과 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`; }
     dz.innerHTML=`<div class="drop-t">다른 캡처를 끌어다 놓거나 <b>Ctrl+V</b></div><img src="${url}" alt="입력 캡처"><input type="file" id="file" accept="image/*" hidden>`;
@@ -1463,12 +1667,14 @@ const PRESETS=[
   ['모니터 표준 · OMEN',{maker:'HP',brand:'',name:'OMEN 27 G2 27인치 평면 IPS FHD 180Hz',sub:'',kw:'',spec:'게이밍모니터|68.6cm(27인치)|평면|IPS|FHD(1920x1080)|16:9|180Hz|응답속도:1ms(GTG)|밝기:400nit|명암비:1000:1|DCI-P3 95%|HDR400|AMD FreeSync|DP 1.4 x1|HDMI 2.0 x2|3.5mm 오디오 출력|높낮이 조절|틸트|피벗|VESA:100x100|HP Eye Ease|무게:약 8.0kg'}],
   ['완제품 · OMEN 35L (SSD 추가)',{maker:'HP',brand:'HyperX OMEN',name:'HyperX OMEN 35L GT18-0000KR (Ultra7-270K Plus/RTX5080/32GB/1TB/Win11Pro) [2TB SSD 추가]',sub:'',kw:'',spec:''}],
   ['노트북 · 빅터스 15',{maker:'HP',brand:'빅터스',name:'빅터스 15-fb2055AX + 32GB 구성(16+16) + NVMe SSD 1TB 교체 + Win11P DSP 설치',sub:'',kw:'',spec:''}],
+  ['RAM · 데스크탑 DDR5',{maker:'타무즈',brand:'',name:'[타무즈] 데스크탑 DDR5-5600 CL46 (16GB) - 44800',sub:'',kw:'',spec:''}],
+  ['RAM · 서버 DDR5',{maker:'마이크론',brand:'',name:'[마이크론] DDR5 PC5-51200 ECC/REG 64GB 서버용 메모리 - 6400',sub:'',kw:'',spec:''}],
   ['모니터 · 삼성',{maker:'삼성전자',brand:'',name:'LS24D304GAKXKR 평면모니터 S30GD 24인치 IPS패널 FHD 주사율100Hz (S24C314 후속모델)',sub:'',kw:'',spec:''}]
 ];
 // 예제: 정상·오류·미등록을 먼저 노출하고 나머지는 펼쳐서 선택
-const FEATURED=[0,1,3,5,9,10,12,13];
+const FEATURED=[0,1,3,5,9,10,12,13,14,15];
 function presetBtn(p,i){ const [t]=p; const parts=t.split(' · '); const kind=parts[0], label=parts[1]||'';
-  const isMon=/^모니터/.test(kind), isSet=/^(완제품|노트북)/.test(kind);
+  const isMon=/^모니터/.test(kind), isSet=/^(완제품|노트북|RAM)/.test(kind);
   const k=isSet?['k-mon',kind]:isMon?['k-mon','모니터']:/^정상/.test(kind)?['k-ok','정상']:/미등록/.test(kind)?['k-unk','미등록']:['k-err','오류 예제'];
   const head=isMon?kind.replace(/^모니터\s*/,''):kind;
   const text=(/^정상/.test(kind)||isSet?[label]:[head,label]).filter(Boolean).join(' · ');
@@ -1476,6 +1682,7 @@ function presetBtn(p,i){ const [t]=p; const parts=t.split(' · '); const kind=pa
 /* 지원 카테고리 (헤더 칩 → 패널). 카테고리가 늘면 CATS에 한 줄 추가 */
 const CATS=[
   {n:'CPU',m:'사양 DB 생성',s:()=>`Intel 데스크톱 ${Object.keys(DB).length}개 모델 · 서버 Xeon 6 ${Object.keys(SERVER_DB).length}개 모델`},
+  {n:'RAM',m:'상품명 기반 생성',s:()=>'데스크탑·서버용 메모리 (DDR 세대·속도·용량 등 상품명에 있는 값만 사용)'},
   {n:'모니터',m:'정렬 · 점검',s:()=>'기존 중요요약을 표준 순서로 정렬 (값을 새로 만들지 않음)'},
   {n:'완제품 PC',m:'시리즈 규칙',s:()=>{const a=Object.entries(SET_HW).filter(([k,v])=>v.cat==='pc');return `HP ${a.map(([k,v])=>v.series+' ('+k+')').join(', ')} · ${a.length}종`;}},
   {n:'노트북',m:'시리즈 규칙',s:()=>{const a=Object.entries(SET_HW).filter(([k,v])=>v.cat==='nb');return `HP ${a.map(([k,v])=>v.series+' ('+k+')').join(', ')} · ${a.length}종`;}}
