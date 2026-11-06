@@ -353,6 +353,15 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
 .ocr-crop{margin-top:8px}
 .ocr-crop .crop-l{font-size:12px;font-weight:700;color:var(--blue-ink);margin-bottom:4px}
 .ocr-crop canvas{display:block;max-width:100%;height:auto;border:1.5px solid var(--blue-line);border-radius:4px;background:#fff}
+  .spm .sp-sec{border-top:1px solid var(--line);padding:14px 0}.spm .sp-sec:first-child{border-top:none;padding-top:0}
+  .spm textarea{width:100%;min-height:150px;font:12.5px/1.5 var(--mono);padding:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:var(--r-s)}
+  .spm input[type=text],.spm select{width:100%;padding:8px 10px;border:1px solid var(--line);font:inherit;background:var(--panel);color:var(--ink);border-radius:var(--r-s)}
+  .spm .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+  .spm .sp-item{border:1px solid var(--line);padding:10px 12px;margin-top:8px;background:var(--panel);border-radius:var(--r-s)}
+  .spm .sp-note{font-size:12.5px;color:var(--ink-2);margin-top:6px;line-height:1.55}
+  .spm .sp-ok{color:var(--ok)}.spm .sp-bad{color:var(--err)}
+  .spm table{border-collapse:collapse;font-size:12.5px;margin-top:6px}.spm td,.spm th{border:1px solid var(--line);padding:3px 8px;text-align:left}
+  .spm h3{font-size:14px;margin:0 0 6px}
 </style>
 </head>
 <body>
@@ -366,7 +375,7 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
       </div>
     </div>
     <div class="meta">
-      <div class="chips"><span class="chip">Chief Naming Officer</span><span class="chip v">v2.1</span><span class="chip" id="buildChip" title="배포된 파일 확인용 빌드 번호">빌드 20261106-1450</span><span class="catwrap"><button type="button" class="chip chip-btn" id="catBtn" aria-expanded="false" aria-controls="catPanel">지원 카테고리 <b id="catN"></b> <span aria-hidden="true">▾</span></button><div class="catpanel" id="catPanel" role="region" aria-label="지원 카테고리" hidden></div></span></div>
+      <div class="chips"><span class="chip">Chief Naming Officer</span><span class="chip v" id="verChip">v2.1</span><span class="chip" id="buildChip" title="배포된 파일 확인용 빌드 번호">빌드 -</span><span class="chip" id="specChip" title="사양 데이터 출처">사양 -</span><span class="catwrap"><button type="button" class="chip chip-btn" id="catBtn" aria-expanded="false" aria-controls="catPanel">지원 카테고리 <b id="catN"></b> <span aria-hidden="true">▾</span></button><div class="catpanel" id="catPanel" role="region" aria-label="지원 카테고리" hidden></div></span></div>
       <div class="credit">Romi Lab · Created by Romi Kim</div>
     </div>
   </header>
@@ -465,9 +474,38 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
     </div>
   </section>
 
-  <div class="foot">CNO · Chief Naming Officer v2.1 · Romi Lab · Created by Romi Kim · 회사 데이터 미포함 · 브라우저 내 처리 · 빌드 20261106-1450</div>
+
+  <!-- 사양 데이터 관리 -->
+  <section class="card spm" id="specMgr" aria-labelledby="spT">
+    <div class="card-hd"><div><h2 class="card-t" id="spT">사양 데이터 관리</h2><div class="card-d">공통 사양 파일(specs.json)과 이 브라우저의 임시 변경을 구분해 보여 줍니다. 검증 완료는 사람이 출처 페이지와 값을 대조해 승인한 것만입니다.</div></div></div>
+    <div class="card-b">
+      <details class="fold" id="spDet"><summary>사양 상태 · 새 사양 붙여넣기 · 오류 신고 · 임시 변경</summary><div class="fold-b">
+      <div class="sp-sec" id="spStatus"></div>
+      <div class="sp-sec"><h3>① 새 사양 붙여넣기 → 검토 대기</h3>
+        <div class="sp-note">Claude 채팅 등에서 받은 사양 블록(JSON)을 붙여넣습니다. 형식 검사만 하며 <b>공식 사양과 대조한 것이 아닙니다</b>. 통과해도 '검토 대기'로만 들어가고, 출처 페이지 대조 후 승인해야 확정 출력에 쓰입니다.</div>
+        <div class="row"><button type="button" class="btn btn-ghost" id="spPromptBtn">Claude 확인 요청문 복사</button><span class="sp-note" id="spPromptNote"></span></div>
+        <textarea id="spBlock" spellcheck="false" placeholder='{"kind":"server_cpu","key":"5320","values":{...},"source":{"url":"https://www.intel.com/..."},"checkedAt":"2026-11-06"}'></textarea>
+        <div class="row"><button type="button" class="btn btn-ghost" id="spCheckBtn">형식 검사</button><button type="button" class="btn" id="spAddBtn">검토 대기로 추가 (이 브라우저에만)</button></div>
+        <div id="spBlockOut" class="sp-note"></div></div>
+      <div class="sp-sec"><h3>② 기존 모델 오류 신고 · 재검증</h3>
+        <div class="sp-note">결과 화면의 "이 모델 오류 신고·재검증"을 누르면 아래에 채워집니다. 변경 전후와 이유가 기록되고, 변경된 값은 이후 출력에 바로 반영됩니다(검토 대기 표시 포함).</div>
+        <div class="row"><select id="spRepKind"><option value="desktop_cpu">데스크톱 CPU</option><option value="server_cpu">서버 CPU</option><option value="memory_registry">메모리 등록본(파트 번호)</option></select><input type="text" id="spRepKey" placeholder="모델명 (예: 14600K)" style="flex:1;min-width:160px"><button type="button" class="btn btn-ghost" id="spRepLoad">현재 값 불러오기</button></div>
+        <textarea id="spRepVals" spellcheck="false" placeholder="현재 값이 여기에 JSON으로 표시됩니다. 수정값을 제안하려면 고치세요."></textarea>
+        <input type="text" id="spRepWhy" placeholder="이유 (필수) — 예: 출처 페이지 최대 클럭 5.3GHz ↔ DB 5.4GHz" style="margin-top:8px">
+        <input type="text" id="spRepUrl" placeholder="출처 URL (수정값 제안 시 권장)" style="margin-top:8px">
+        <div class="row"><button type="button" class="btn btn-ghost" id="spRepConflict">충돌 표시만 기록 (값은 그대로)</button><button type="button" class="btn" id="spRepModify">수정값 제안으로 기록 (검토 대기)</button></div>
+        <div id="spRepOut" class="sp-note"></div></div>
+      <div class="sp-sec"><h3>③ 이 브라우저의 임시 변경</h3><div id="spLocal"></div>
+        <div class="row"><button type="button" class="btn btn-ghost" id="spExport">변경 내용 파일로 내보내기</button><button type="button" class="btn btn-ghost" id="spClear">임시 변경 모두 지우기</button></div>
+        <div class="sp-note">내보낸 파일(specs-changes-날짜.json)을 담당자(제작자)에게 주면 공통 <code>specs.json</code>에 반영해 다시 배포합니다. 반영 전까지는 <b>이 브라우저에서만</b> 적용되며, 다른 PC·다른 사람 화면에는 나타나지 않습니다.</div></div>
+      </div></details>
+    </div>
+  </section>
+
+  <div class="foot">CNO · Chief Naming Officer <span id="footVer">v2.1</span> · Romi Lab · Created by Romi Kim · 회사 데이터 미포함 · 브라우저 내 처리 · <span id="footBuild"></span></div>
 </div>
 
+<!--SPECS-EMBED-START--><script type="application/json" id="specsEmbedded">{"schema":"cno-specs/1","version":"2026-11-06.1","updated":"2026-11-06","note":"사양 데이터 파일. 출력 규칙(상품명·브랜드·키워드·중요요약 생성)은 index.html에 있음. status 5종: extracted(입력에서 추출)·ocr_suggested(OCR 교정 제안)·external_candidate(외부 자료 후보)·verified(출처 대조 완료)·conflict(충돌·확인불가)","sources":{"intel-sku-203474":{"type":"official-page","publisher":"Intel","url":"https://www.intel.com/content/www/us/en/products/sku/203474/intel-core-i310105f-processor-6m-cache-up-to-4-40-ghz/specifications.html","title":"Intel® 10105F Specifications"},"intel-sku-198017":{"type":"official-page","publisher":"Intel","url":"https://www.intel.com/content/www/us/en/products/sku/198017/intel-core-i910980xe-extreme-edition-processor-24-75m-cache-3-00-ghz/specifications.html","title":"Intel® 10980XE Specifications"},"intel-sku-215285":{"type":"official-page","publisher":"Intel","url":"https://www.intel.com/content/www/us/en/products/sku/215285/intel-xeon-gold-5320-processor-39m-cache-2-20-ghz/specifications.html","title":"Intel® Xeon® 5320 Specifications"},"intel-sku-241825":{"type":"official-page","publisher":"Intel","url":"https://www.intel.com/content/www/us/en/products/sku/241825/intel-xeon-6747p-processor-288m-cache-2-70-ghz/specifications.html","title":"Intel® Xeon® 6747P Specifications"},"intel-sku-241845":{"type":"official-page","publisher":"Intel","url":"https://www.intel.com/content/www/us/en/products/sku/241845/intel-xeon-6767p-processor-336m-cache-2-40-ghz/specifications.html","title":"Intel® Xeon® 6767P Specifications"},"intel-sku-237556":{"type":"official-page","publisher":"Intel","url":"https://www.intel.com/content/www/us/en/products/sku/237556/intel-xeon-silver-4516y-processor-45m-cache-2-20-ghz/specifications.html","title":"Intel® Xeon® 4516Y+ Specifications"}},"generations":{"10":{"label":"10세대","sum":"10세대 Core","cn":"코멧레이크 리프레시","cn0":"코멧레이크","socket":"LGA1200","proc":"14nm","maxmem":128,"pcie":"3.0","lanes":16,"legacy":true},"12":{"label":"12세대","sum":"12세대 Core","cn":"앨더레이크","socket":"LGA1700","proc":"Intel 7","maxmem":128,"pcie":"5.0/4.0","lanes":20},"13":{"label":"13세대","sum":"13세대 Core","cn":"랩터레이크","socket":"LGA1700","proc":"Intel 7","maxmem":192,"pcie":"5.0/4.0","lanes":20},"14":{"label":"14세대","sum":"14세대 Core","cn":"랩터레이크 리프레시","socket":"LGA1700","proc":"Intel 7","maxmem":192,"pcie":"5.0/4.0","lanes":20},"X10":{"label":"10세대","sum":"10세대 Core X","cn":"캐스케이드레이크","socket":"LGA2066","proc":"14nm","maxmem":256,"pcie":"3.0","lanes":48,"legacy":true},"U2":{"label":"코어 울트라 200S","sum":"Core Ultra 200S","cn":"애로우레이크","socket":"LGA1851","proc":"TSMC N3B","maxmem":256,"pcie":"5.0/4.0","lanes":24},"U2P":{"label":"코어 울트라 200S Plus","sum":"Core Ultra 200S Plus","cn":"애로우레이크 리프레시","socket":"LGA1851","proc":"TSMC N3B","maxmem":256,"pcie":"5.0/4.0","lanes":24}},"desktop_cpu":{"225":{"model":"225","gen":"U2","tier":"U5","p":6,"e":4,"t":10,"pb":3.3,"pt":4.9,"eb":2.7,"et":4.4,"max":4.9,"l2":22,"l3":20,"bp":65,"mtp":121,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":1.8,"k":false,"ht":false,"disp":"225","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"235":{"model":"235","gen":"U2","tier":"U5","p":6,"e":8,"t":14,"pb":3.4,"pt":5,"eb":2.9,"et":4.4,"max":5,"l2":26,"l3":24,"bp":65,"mtp":121,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":2,"k":false,"ht":false,"disp":"235","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"245":{"model":"245","gen":"U2","tier":"U5","p":6,"e":8,"t":14,"pb":3.5,"pt":5.1,"eb":3,"et":4.5,"max":5.1,"l2":26,"l3":24,"bp":65,"mtp":121,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":1.9,"k":false,"ht":false,"disp":"245","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"265":{"model":"265","gen":"U2","tier":"U7","p":8,"e":12,"t":20,"pb":2.4,"pt":5.2,"eb":1.8,"et":4.6,"max":5.3,"l2":36,"l3":30,"bp":65,"mtp":182,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":1.95,"k":false,"ht":false,"disp":"265","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"285":{"model":"285","gen":"U2","tier":"U9","p":8,"e":16,"t":24,"pb":2.5,"pt":5.4,"eb":1.9,"et":4.6,"max":5.6,"l2":40,"l3":36,"bp":65,"mtp":182,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":2,"k":false,"ht":false,"disp":"285","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12100":{"model":"12100","gen":12,"tier":"i3","p":4,"e":0,"t":8,"pb":3.3,"pt":4.3,"eb":null,"et":null,"max":4.3,"l2":5,"l3":12,"bp":60,"mtp":89,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 730","gf":1.4,"k":false,"ht":true,"disp":"12100","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12400":{"model":"12400","gen":12,"tier":"i5","p":6,"e":0,"t":12,"pb":2.5,"pt":4.4,"eb":null,"et":null,"max":4.4,"l2":7.5,"l3":18,"bp":65,"mtp":117,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 730","gf":1.45,"k":false,"ht":true,"disp":"12400","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12500":{"model":"12500","gen":12,"tier":"i5","p":6,"e":0,"t":12,"pb":3,"pt":4.6,"eb":null,"et":null,"max":4.6,"l2":7.5,"l3":18,"bp":65,"mtp":117,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.45,"k":false,"ht":true,"disp":"12500","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12600":{"model":"12600","gen":12,"tier":"i5","p":6,"e":0,"t":12,"pb":3.3,"pt":4.8,"eb":null,"et":null,"max":4.8,"l2":7.5,"l3":18,"bp":65,"mtp":117,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.45,"k":false,"ht":true,"disp":"12600","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12700":{"model":"12700","gen":12,"tier":"i7","p":8,"e":4,"t":20,"pb":2.1,"pt":4.8,"eb":1.6,"et":3.6,"max":4.9,"l2":12,"l3":25,"bp":65,"mtp":180,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.5,"k":false,"ht":true,"disp":"12700","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12900":{"model":"12900","gen":12,"tier":"i9","p":8,"e":8,"t":24,"pb":2.4,"pt":5,"eb":1.8,"et":3.8,"max":5.1,"l2":14,"l3":30,"bp":65,"mtp":202,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.55,"k":false,"ht":true,"disp":"12900","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"13100":{"model":"13100","gen":13,"tier":"i3","p":4,"e":0,"t":8,"pb":3.4,"pt":4.5,"eb":null,"et":null,"max":4.5,"l2":5,"l3":12,"bp":60,"mtp":110,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 730","gf":1.5,"k":false,"ht":true,"disp":"13100","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"13400":{"model":"13400","gen":13,"tier":"i5","p":6,"e":4,"t":16,"pb":2.5,"pt":4.6,"eb":1.8,"et":3.3,"max":4.6,"l2":9.5,"l3":20,"bp":65,"mtp":148,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 730","gf":1.55,"k":false,"ht":true,"disp":"13400","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"13500":{"model":"13500","gen":13,"tier":"i5","p":6,"e":8,"t":20,"pb":2.5,"pt":4.8,"eb":1.8,"et":3.5,"max":4.8,"l2":11.5,"l3":24,"bp":65,"mtp":154,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.55,"k":false,"ht":true,"disp":"13500","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"13700":{"model":"13700","gen":13,"tier":"i7","p":8,"e":8,"t":24,"pb":2.1,"pt":5.1,"eb":1.5,"et":4.1,"max":5.2,"l2":24,"l3":30,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.6,"k":false,"ht":true,"disp":"13700","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13900":{"model":"13900","gen":13,"tier":"i9","p":8,"e":16,"t":32,"pb":2,"pt":5.2,"eb":1.5,"et":4.2,"max":5.6,"l2":32,"l3":36,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.65,"k":false,"ht":true,"disp":"13900","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14100":{"model":"14100","gen":14,"tier":"i3","p":4,"e":0,"t":8,"pb":3.5,"pt":4.7,"eb":null,"et":null,"max":4.7,"l2":5,"l3":12,"bp":60,"mtp":110,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 730","gf":1.5,"k":false,"ht":true,"disp":"14100","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14400":{"model":"14400","gen":14,"tier":"i5","p":6,"e":4,"t":16,"pb":2.5,"pt":4.7,"eb":1.8,"et":3.5,"max":4.7,"l2":9.5,"l3":20,"bp":65,"mtp":148,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 730","gf":1.55,"k":false,"ht":true,"disp":"14400","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14500":{"model":"14500","gen":14,"tier":"i5","p":6,"e":8,"t":20,"pb":2.6,"pt":5,"eb":1.9,"et":3.7,"max":5,"l2":11.5,"l3":24,"bp":65,"mtp":154,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.55,"k":false,"ht":true,"disp":"14500","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14700":{"model":"14700","gen":14,"tier":"i7","p":8,"e":12,"t":28,"pb":2.1,"pt":5.3,"eb":1.5,"et":4.2,"max":5.4,"l2":28,"l3":33,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.6,"k":false,"ht":true,"disp":"14700","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14900":{"model":"14900","gen":14,"tier":"i9","p":8,"e":16,"t":32,"pb":2,"pt":5.4,"eb":1.5,"et":4.3,"max":5.8,"l2":32,"l3":36,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.65,"k":false,"ht":true,"disp":"14900","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12100F":{"model":"12100F","gen":12,"tier":"i3","p":4,"e":0,"t":8,"pb":3.3,"pt":4.3,"eb":null,"et":null,"max":4.3,"l2":5,"l3":12,"bp":58,"mtp":89,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.4,"k":false,"ht":true,"disp":"12100F","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12400F":{"model":"12400F","gen":12,"tier":"i5","p":6,"e":0,"t":12,"pb":2.5,"pt":4.4,"eb":null,"et":null,"max":4.4,"l2":7.5,"l3":18,"bp":65,"mtp":117,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.45,"k":false,"ht":true,"disp":"12400F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"12600K":{"model":"12600K","gen":12,"tier":"i5","p":6,"e":4,"t":16,"pb":3.7,"pt":4.9,"eb":2.8,"et":3.6,"max":4.9,"l2":9.5,"l3":20,"bp":125,"mtp":150,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.45,"k":true,"ht":true,"disp":"12600K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12600KF":{"model":"12600KF","gen":12,"tier":"i5","p":6,"e":4,"t":16,"pb":3.7,"pt":4.9,"eb":2.8,"et":3.6,"max":4.9,"l2":9.5,"l3":20,"bp":125,"mtp":150,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.45,"k":true,"ht":true,"disp":"12600KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"12700F":{"model":"12700F","gen":12,"tier":"i7","p":8,"e":4,"t":20,"pb":2.1,"pt":4.8,"eb":1.6,"et":3.6,"max":4.9,"l2":12,"l3":25,"bp":65,"mtp":180,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.5,"k":false,"ht":true,"disp":"12700F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"12700K":{"model":"12700K","gen":12,"tier":"i7","p":8,"e":4,"t":20,"pb":3.6,"pt":4.9,"eb":2.7,"et":3.8,"max":5,"l2":12,"l3":25,"bp":125,"mtp":190,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.5,"k":true,"ht":true,"disp":"12700K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12700KF":{"model":"12700KF","gen":12,"tier":"i7","p":8,"e":4,"t":20,"pb":3.6,"pt":4.9,"eb":2.7,"et":3.8,"max":5,"l2":12,"l3":25,"bp":125,"mtp":190,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.5,"k":true,"ht":true,"disp":"12700KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"12900F":{"model":"12900F","gen":12,"tier":"i9","p":8,"e":8,"t":24,"pb":2.4,"pt":5,"eb":1.8,"et":3.8,"max":5.1,"l2":14,"l3":30,"bp":65,"mtp":202,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.55,"k":false,"ht":true,"disp":"12900F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"12900K":{"model":"12900K","gen":12,"tier":"i9","p":8,"e":8,"t":24,"pb":3.2,"pt":5.1,"eb":2.4,"et":3.9,"max":5.2,"l2":14,"l3":30,"bp":125,"mtp":241,"mem":"DDR5-4800/DDR4-3200","gpu":"UHD 770","gf":1.55,"k":true,"ht":true,"disp":"12900K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"12900KF":{"model":"12900KF","gen":12,"tier":"i9","p":8,"e":8,"t":24,"pb":3.2,"pt":5.1,"eb":2.4,"et":3.9,"max":5.2,"l2":14,"l3":30,"bp":125,"mtp":241,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.55,"k":true,"ht":true,"disp":"12900KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13100F":{"model":"13100F","gen":13,"tier":"i3","p":4,"e":0,"t":8,"pb":3.4,"pt":4.5,"eb":null,"et":null,"max":4.5,"l2":5,"l3":12,"bp":58,"mtp":110,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.5,"k":false,"ht":true,"disp":"13100F","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"13400F":{"model":"13400F","gen":13,"tier":"i5","p":6,"e":4,"t":16,"pb":2.5,"pt":4.6,"eb":1.8,"et":3.3,"max":4.6,"l2":9.5,"l3":20,"bp":65,"mtp":148,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.55,"k":false,"ht":true,"disp":"13400F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13600K":{"model":"13600K","gen":13,"tier":"i5","p":6,"e":8,"t":20,"pb":3.5,"pt":5.1,"eb":2.6,"et":3.9,"max":5.1,"l2":20,"l3":24,"bp":125,"mtp":181,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.5,"k":true,"ht":true,"disp":"13600K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"13600KF":{"model":"13600KF","gen":13,"tier":"i5","p":6,"e":8,"t":20,"pb":3.5,"pt":5.1,"eb":2.6,"et":3.9,"max":5.1,"l2":20,"l3":24,"bp":125,"mtp":181,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.5,"k":true,"ht":true,"disp":"13600KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13700F":{"model":"13700F","gen":13,"tier":"i7","p":8,"e":8,"t":24,"pb":2.1,"pt":5.1,"eb":1.5,"et":4.1,"max":5.2,"l2":24,"l3":30,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.6,"k":false,"ht":true,"disp":"13700F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13700K":{"model":"13700K","gen":13,"tier":"i7","p":8,"e":8,"t":24,"pb":3.4,"pt":5.3,"eb":2.5,"et":4.2,"max":5.4,"l2":24,"l3":30,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.6,"k":true,"ht":true,"disp":"13700K","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13700KF":{"model":"13700KF","gen":13,"tier":"i7","p":8,"e":8,"t":24,"pb":3.4,"pt":5.3,"eb":2.5,"et":4.2,"max":5.4,"l2":24,"l3":30,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.6,"k":true,"ht":true,"disp":"13700KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13900F":{"model":"13900F","gen":13,"tier":"i9","p":8,"e":16,"t":32,"pb":2,"pt":5.2,"eb":1.5,"et":4.2,"max":5.6,"l2":32,"l3":36,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.65,"k":false,"ht":true,"disp":"13900F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"13900K":{"model":"13900K","gen":13,"tier":"i9","p":8,"e":16,"t":32,"pb":3,"pt":5.4,"eb":2.2,"et":4.3,"max":5.8,"l2":32,"l3":36,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.65,"k":true,"ht":true,"disp":"13900K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"13900KF":{"model":"13900KF","gen":13,"tier":"i9","p":8,"e":16,"t":32,"pb":3,"pt":5.4,"eb":2.2,"et":4.3,"max":5.8,"l2":32,"l3":36,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.65,"k":true,"ht":true,"disp":"13900KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"14100F":{"model":"14100F","gen":14,"tier":"i3","p":4,"e":0,"t":8,"pb":3.5,"pt":4.7,"eb":null,"et":null,"max":4.7,"l2":5,"l3":12,"bp":58,"mtp":110,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.5,"k":false,"ht":true,"disp":"14100F","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14400F":{"model":"14400F","gen":14,"tier":"i5","p":6,"e":4,"t":16,"pb":2.5,"pt":4.7,"eb":1.8,"et":3.5,"max":4.7,"l2":9.5,"l3":20,"bp":65,"mtp":148,"mem":"DDR5-4800/DDR4-3200","gpu":null,"gf":1.55,"k":false,"ht":true,"disp":"14400F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"14600K":{"model":"14600K","gen":14,"tier":"i5","p":6,"e":8,"t":20,"pb":3.5,"pt":5.3,"eb":2.6,"et":4,"max":5.3,"l2":20,"l3":24,"bp":125,"mtp":181,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.55,"k":true,"ht":true,"disp":"14600K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14600KF":{"model":"14600KF","gen":14,"tier":"i5","p":6,"e":8,"t":20,"pb":3.5,"pt":5.3,"eb":2.6,"et":4,"max":5.3,"l2":20,"l3":24,"bp":125,"mtp":181,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.55,"k":true,"ht":true,"disp":"14600KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"14700F":{"model":"14700F","gen":14,"tier":"i7","p":8,"e":12,"t":28,"pb":2.1,"pt":5.3,"eb":1.5,"et":4.2,"max":5.4,"l2":28,"l3":33,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.6,"k":false,"ht":true,"disp":"14700F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"14700K":{"model":"14700K","gen":14,"tier":"i7","p":8,"e":12,"t":28,"pb":3.4,"pt":5.5,"eb":2.5,"et":4.3,"max":5.6,"l2":28,"l3":33,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.6,"k":true,"ht":true,"disp":"14700K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14700KF":{"model":"14700KF","gen":14,"tier":"i7","p":8,"e":12,"t":28,"pb":3.4,"pt":5.5,"eb":2.5,"et":4.3,"max":5.6,"l2":28,"l3":33,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.6,"k":true,"ht":true,"disp":"14700KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"14900F":{"model":"14900F","gen":14,"tier":"i9","p":8,"e":16,"t":32,"pb":2,"pt":5.4,"eb":1.5,"et":4.3,"max":5.8,"l2":32,"l3":36,"bp":65,"mtp":219,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.65,"k":false,"ht":true,"disp":"14900F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"14900K":{"model":"14900K","gen":14,"tier":"i9","p":8,"e":16,"t":32,"pb":3.2,"pt":5.6,"eb":2.4,"et":4.4,"max":6,"l2":32,"l3":36,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":"UHD 770","gf":1.65,"k":true,"ht":true,"disp":"14900K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"14900KF":{"model":"14900KF","gen":14,"tier":"i9","p":8,"e":16,"t":32,"pb":3.2,"pt":5.6,"eb":2.4,"et":4.4,"max":6,"l2":32,"l3":36,"bp":125,"mtp":253,"mem":"DDR5-5600/DDR4-3200","gpu":null,"gf":1.65,"k":true,"ht":true,"disp":"14900KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"225F":{"model":"225F","gen":"U2","tier":"U5","p":6,"e":4,"t":10,"pb":3.3,"pt":4.9,"eb":2.7,"et":4.4,"max":4.9,"l2":22,"l3":20,"bp":65,"mtp":121,"mem":"DDR5-6400","gpu":null,"gf":1.8,"k":false,"ht":false,"disp":"225F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"245K":{"model":"245K","gen":"U2","tier":"U5","p":6,"e":8,"t":14,"pb":4.2,"pt":5.2,"eb":3.6,"et":4.6,"max":5.2,"l2":26,"l3":24,"bp":125,"mtp":159,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":1.9,"k":true,"ht":false,"disp":"245K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"245KF":{"model":"245KF","gen":"U2","tier":"U5","p":6,"e":8,"t":14,"pb":4.2,"pt":5.2,"eb":3.6,"et":4.6,"max":5.2,"l2":26,"l3":24,"bp":125,"mtp":159,"mem":"DDR5-6400","gpu":null,"gf":1.9,"k":true,"ht":false,"disp":"245KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"265F":{"model":"265F","gen":"U2","tier":"U7","p":8,"e":12,"t":20,"pb":2.4,"pt":5.2,"eb":1.8,"et":4.6,"max":5.3,"l2":36,"l3":30,"bp":65,"mtp":182,"mem":"DDR5-6400","gpu":null,"gf":1.95,"k":false,"ht":false,"disp":"265F","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"265K":{"model":"265K","gen":"U2","tier":"U7","p":8,"e":12,"t":20,"pb":3.9,"pt":5.4,"eb":3.3,"et":4.6,"max":5.5,"l2":36,"l3":30,"bp":125,"mtp":250,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":2,"k":true,"ht":false,"disp":"265K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"265KF":{"model":"265KF","gen":"U2","tier":"U7","p":8,"e":12,"t":20,"pb":3.9,"pt":5.4,"eb":3.3,"et":4.6,"max":5.5,"l2":36,"l3":30,"bp":125,"mtp":250,"mem":"DDR5-6400","gpu":null,"gf":2,"k":true,"ht":false,"disp":"265KF","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"285K":{"model":"285K","gen":"U2","tier":"U9","p":8,"e":16,"t":24,"pb":3.7,"pt":5.5,"eb":3.2,"et":4.6,"max":5.7,"l2":40,"l3":36,"bp":125,"mtp":250,"mem":"DDR5-6400","gpu":"Intel Graphics","gf":2,"k":true,"ht":false,"disp":"285K","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"250KPLUS":{"model":"250KPLUS","gen":"U2P","tier":"U5","p":6,"e":12,"t":18,"pb":4.2,"pt":5.3,"eb":3.3,"et":4.6,"max":5.3,"l2":30,"l3":30,"bp":125,"mtp":159,"mem":"DDR5-7200","gpu":"Intel Graphics","gf":1.9,"k":false,"ht":false,"disp":"250K Plus","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"250KFPLUS":{"model":"250KFPLUS","gen":"U2P","tier":"U5","p":6,"e":12,"t":18,"pb":4.2,"pt":5.3,"eb":3.3,"et":4.6,"max":5.3,"l2":30,"l3":30,"bp":125,"mtp":159,"mem":"DDR5-7200","gpu":null,"gf":1.9,"k":false,"ht":false,"disp":"250KF Plus","rec":{"status":"external_candidate","source":null,"checkedAt":null,"method":"","note":"ARK 개별 확인 전 시드 값 — 재검증 필요"},"history":[]},"270KPLUS":{"model":"270KPLUS","gen":"U2P","tier":"U7","p":8,"e":16,"t":24,"pb":3.7,"pt":5.4,"eb":3.2,"et":4.7,"max":5.5,"l2":40,"l3":36,"bp":125,"mtp":250,"mem":"DDR5-7200","gpu":"Intel Graphics","gf":2,"k":false,"ht":false,"disp":"270K Plus","rec":{"status":"external_candidate","source":null,"checkedAt":"2026-11-05","method":"","note":"2026-11-05 담당 확인 기록(ARK_VERIFIED 목록)은 있으나 모델별 출처 URL·값 대조 기록이 없어 후보로 둠 — 재검증 필요"},"history":[]},"10105F":{"model":"10105F","gen":10,"tier":"i3","p":4,"e":0,"t":8,"pb":3.7,"max":4.4,"cache":6,"bp":65,"mem":"DDR4-2666","gpu":null,"gf":null,"k":false,"ht":true,"disp":"10105F","legacy":true,"rec":{"status":"verified","source":"intel-sku-203474","checkedAt":"2026-11-06","method":"Intel 공식 사양 페이지 본문에서 모델명·항목값 대조","note":""},"history":[]},"10980XE":{"model":"10980XE","gen":"X10","tier":"i9","p":18,"e":0,"t":36,"pb":3,"max":4.8,"cache":24.75,"bp":165,"mem":"DDR4-2933","ch":4,"gpu":null,"gf":null,"k":true,"ht":true,"kwx":["익스트림에디션","Extreme Edition"],"notes":[{"sev":"ask","t":"최대 클럭 · 공식 표기 2가지","d":"Intel 공식: Max Turbo 4.6GHz, Turbo Boost Max 3.0 4.8GHz. 12세대 이후 등록본처럼 가장 높은 값 4.8GHz를 넣었습니다. 4.6GHz로 쓰는 방식이면 알려 주세요"},{"sev":"ask","t":"10세대 Core X · 형식 제안","d":"X 시리즈(HEDT)는 일반 10세대와 소켓·메모리 채널이 달라 첫 항목을 10세대 Core X로 구분했습니다(제안). 오버클럭 지원·내장그래픽 미탑재는 Intel 사양 페이지에 항목이 없어 X 시리즈 일반 특성으로 적었으니 확인하세요"}],"disp":"10980XE","legacy":true,"rec":{"status":"verified","source":"intel-sku-198017","checkedAt":"2026-11-06","method":"Intel 공식 사양 페이지 본문에서 모델명·항목값 대조","note":""},"history":[]}},"server_cpu":{"5320":{"fam":"gold3","brand":"Intel® Xeon® Gold","tier":"골드","gen":"3세대","cn":"아이스레이크-SP","cnEn":"Ice Lake","cnKw":["아이스레이크","아이스레이크-SP"],"socket":"LGA4189","proc":"10nm","cores":26,"threads":52,"base":2.2,"max":3.4,"l3":39,"tdp":185,"scal":"2S","upi":"3링크(11.2GT/s)","mem":"DDR4-2933","ch":8,"maxmem":"6TB","ecc":true,"pcie":"4.0","lanes":64,"feat":"Optane/SGX/DL Boost 지원","model":"5320","rec":{"status":"verified","source":"intel-sku-215285","checkedAt":"2026-11-06","method":"Intel 공식 사양 페이지 본문 조회 후 모델명·항목값 대조","note":"PK 오더코드는 Intel 공식 페이지에서 확인하지 못함"},"history":[]},"6747P":{"cn":"그래니트 래피즈","cnEn":"Granite Rapids","socket":"LGA4710","proc":"Intel 3","scal":"2S","upi":"4링크(24GT/s)","mem":"DDR5-6400/MRDIMM-8800","ch":8,"maxmem":"4TB","ecc":true,"pcie":"5.0","lanes":88,"amx":true,"acc":"QAT·DLB·DSA·IAA","cores":48,"threads":96,"base":2.7,"allcore":3.8,"max":3.9,"l3":288,"tdp":330,"model":"6747P","series":"6700P","rec":{"status":"verified","source":"intel-sku-241825","checkedAt":"2026-11-05","method":"Intel 공식 사양 페이지 본문 조회 후 모델명·항목값 대조","note":"PK 오더코드는 Intel 공식 페이지에서 확인하지 못함"},"history":[]},"6767P":{"cn":"그래니트 래피즈","cnEn":"Granite Rapids","socket":"LGA4710","proc":"Intel 3","scal":"2S","upi":"4링크(24GT/s)","mem":"DDR5-6400/MRDIMM-8800","ch":8,"maxmem":"4TB","ecc":true,"pcie":"5.0","lanes":88,"amx":true,"acc":"QAT·DLB·DSA·IAA","cores":64,"threads":128,"base":2.4,"allcore":3.6,"max":3.9,"l3":336,"tdp":350,"pk":"PK8072006269900","model":"6767P","series":"6700P","rec":{"status":"verified","source":"intel-sku-241845","checkedAt":"2026-11-05","method":"Intel 공식 사양 페이지 본문 조회 후 모델명·항목값 대조","note":"PK 오더코드는 담당자 등록값(Intel 페이지 대조 안 됨)"},"history":[]},"4516Y+":{"fam":"gold3","brand":"Intel® Xeon® Silver","tier":"실버","tierEn":"Silver","gen":"5세대","cn":"에메랄드 래피즈","cnEn":"Emerald Rapids","cnKw":["에메랄드 래피즈","에메랄드래피즈"],"socket":"LGA4677","proc":"Intel 7","cores":24,"threads":48,"base":2.2,"max":3.7,"l3":45,"tdp":185,"scal":"2S","upi":"2링크(16GT/s)","mem":"DDR5-4400","ch":8,"maxmem":"4TB","ecc":true,"pcie":"5.0","lanes":80,"feat":"AMX 지원|가속기:QAT·DLB·DSA·IAA","model":"4516Y+","rec":{"status":"verified","source":"intel-sku-237556","checkedAt":"2026-11-06","method":"Intel 공식 사양 페이지 본문 조회 후 모델명·항목값 대조","note":"PK 오더코드는 Intel 공식 페이지에서 확인하지 못함"},"history":[]}},"memory_registry":[{"brand":"삼성메모리","type":"DDR4","cap":4,"speed":3200,"nb":true,"part":"M471A5244CB0-CWE","cl":22,"v":"1.2V","rank":"1Rx16","rec":{"status":"extracted","source":null,"checkedAt":"2026-11-06","method":"담당자 등록 상품의 키워드·중요요약(스크린샷)에서 추출","note":"파트 번호·CL·전압·랭크는 상품명에 없음. 같은 브랜드·용량·속도의 다른 모듈에 자동 적용하지 않음(후보로만)"},"history":[]}],"sodimm_pin":{"DDR2":200,"DDR3":204,"DDR4":260,"DDR5":262}}</script><!--SPECS-EMBED-END-->
 <script>
 /* =========================================================
    0. 유틸
@@ -507,86 +545,8 @@ function canonCN(s){ const k=cnKey(s); return CN_CANON[k] || CN_CANON[k.replace(
    - chk: 'seed' = ARK 개별 페이지 재확인 전 / 'ark' = ARK 개별 확인 완료
    - 새 모델은 아래 BASE에 한 줄 추가하면 F/KF 파생까지 자동 생성
    ========================================================= */
-const GEN = {
-  // 10세대: Intel 공식 사양 페이지 대조 모델만 LEGACY_BASE에 등록 (구세대 형식: 기본 클럭 · 단일 캐시 · TDP)
-  X10:{label:'10세대',sum:'10세대 Core X',cn:'캐스케이드레이크',socket:'LGA2066',proc:'14nm',maxmem:256,pcie:'3.0',lanes:48,legacy:true},
-  10:{label:'10세대',sum:'10세대 Core',cn:'코멧레이크 리프레시',cn0:'코멧레이크',socket:'LGA1200',proc:'14nm',maxmem:128,pcie:'3.0',lanes:16,legacy:true},
-  12:{label:'12세대',sum:'12세대 Core',cn:'앨더레이크',socket:'LGA1700',proc:'Intel 7',maxmem:128,pcie:'5.0/4.0',lanes:20},
-  13:{label:'13세대',sum:'13세대 Core',cn:'랩터레이크',socket:'LGA1700',proc:'Intel 7',maxmem:192,pcie:'5.0/4.0',lanes:20},
-  14:{label:'14세대',sum:'14세대 Core',cn:'랩터레이크 리프레시',socket:'LGA1700',proc:'Intel 7',maxmem:192,pcie:'5.0/4.0',lanes:20},
-  U2:{label:'코어 울트라 200S',sum:'Core Ultra 200S',cn:'애로우레이크',socket:'LGA1851',proc:'TSMC N3B',maxmem:256,pcie:'5.0/4.0',lanes:24},
-  // Plus: Intel ARK 코드명은 Arrow Lake. '리프레시'는 사내 상품명 표기를 따름
-  U2P:{label:'코어 울트라 200S Plus',sum:'Core Ultra 200S Plus',cn:'애로우레이크 리프레시',socket:'LGA1851',proc:'TSMC N3B',maxmem:256,pcie:'5.0/4.0',lanes:24}
-};
-// [모델, 세대, 티어, P, E, P기본, P최대, E기본, E최대, 최대클럭, L2, L3, 기본전력, 최대터보전력, 메모리, 내장GPU, GPU최대(GHz), 파생]
-const BASE = [
-  ['12100',12,'i3',4,0,3.3,4.3,null,null,4.3,5,12,60,89,'DDR5-4800/DDR4-3200','UHD 730',1.4,'F'],
-  ['12400',12,'i5',6,0,2.5,4.4,null,null,4.4,7.5,18,65,117,'DDR5-4800/DDR4-3200','UHD 730',1.45,'F'],
-  ['12500',12,'i5',6,0,3.0,4.6,null,null,4.6,7.5,18,65,117,'DDR5-4800/DDR4-3200','UHD 770',1.45,''],
-  ['12600',12,'i5',6,0,3.3,4.8,null,null,4.8,7.5,18,65,117,'DDR5-4800/DDR4-3200','UHD 770',1.45,''],
-  ['12600K',12,'i5',6,4,3.7,4.9,2.8,3.6,4.9,9.5,20,125,150,'DDR5-4800/DDR4-3200','UHD 770',1.45,'KF'],
-  ['12700',12,'i7',8,4,2.1,4.8,1.6,3.6,4.9,12,25,65,180,'DDR5-4800/DDR4-3200','UHD 770',1.5,'F'],
-  ['12700K',12,'i7',8,4,3.6,4.9,2.7,3.8,5.0,12,25,125,190,'DDR5-4800/DDR4-3200','UHD 770',1.5,'KF'],
-  ['12900',12,'i9',8,8,2.4,5.0,1.8,3.8,5.1,14,30,65,202,'DDR5-4800/DDR4-3200','UHD 770',1.55,'F'],
-  ['12900K',12,'i9',8,8,3.2,5.1,2.4,3.9,5.2,14,30,125,241,'DDR5-4800/DDR4-3200','UHD 770',1.55,'KF'],
-  ['13100',13,'i3',4,0,3.4,4.5,null,null,4.5,5,12,60,110,'DDR5-4800/DDR4-3200','UHD 730',1.5,'F'],
-  ['13400',13,'i5',6,4,2.5,4.6,1.8,3.3,4.6,9.5,20,65,148,'DDR5-4800/DDR4-3200','UHD 730',1.55,'F'],
-  ['13500',13,'i5',6,8,2.5,4.8,1.8,3.5,4.8,11.5,24,65,154,'DDR5-4800/DDR4-3200','UHD 770',1.55,''],
-  ['13600K',13,'i5',6,8,3.5,5.1,2.6,3.9,5.1,20,24,125,181,'DDR5-5600/DDR4-3200','UHD 770',1.5,'KF'],
-  ['13700',13,'i7',8,8,2.1,5.1,1.5,4.1,5.2,24,30,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.6,'F'],
-  ['13700K',13,'i7',8,8,3.4,5.3,2.5,4.2,5.4,24,30,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.6,'KF'],
-  ['13900',13,'i9',8,16,2.0,5.2,1.5,4.2,5.6,32,36,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.65,'F'],
-  ['13900K',13,'i9',8,16,3.0,5.4,2.2,4.3,5.8,32,36,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.65,'KF'],
-  ['14100',14,'i3',4,0,3.5,4.7,null,null,4.7,5,12,60,110,'DDR5-4800/DDR4-3200','UHD 730',1.5,'F'],
-  ['14400',14,'i5',6,4,2.5,4.7,1.8,3.5,4.7,9.5,20,65,148,'DDR5-4800/DDR4-3200','UHD 730',1.55,'F'],
-  ['14500',14,'i5',6,8,2.6,5.0,1.9,3.7,5.0,11.5,24,65,154,'DDR5-4800/DDR4-3200','UHD 770',1.55,''],
-  ['14600K',14,'i5',6,8,3.5,5.3,2.6,4.0,5.3,20,24,125,181,'DDR5-5600/DDR4-3200','UHD 770',1.55,'KF'],
-  ['14700',14,'i7',8,12,2.1,5.3,1.5,4.2,5.4,28,33,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.6,'F'],
-  ['14700K',14,'i7',8,12,3.4,5.5,2.5,4.3,5.6,28,33,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.6,'KF'],
-  ['14900',14,'i9',8,16,2.0,5.4,1.5,4.3,5.8,32,36,65,219,'DDR5-5600/DDR4-3200','UHD 770',1.65,'F'],
-  ['14900K',14,'i9',8,16,3.2,5.6,2.4,4.4,6.0,32,36,125,253,'DDR5-5600/DDR4-3200','UHD 770',1.65,'KF'],
-  ['225','U2','U5',6,4,3.3,4.9,2.7,4.4,4.9,22,20,65,121,'DDR5-6400','Intel Graphics',1.8,'F'],
-  ['235','U2','U5',6,8,3.4,5.0,2.9,4.4,5.0,26,24,65,121,'DDR5-6400','Intel Graphics',2.0,''],
-  ['245','U2','U5',6,8,3.5,5.1,3.0,4.5,5.1,26,24,65,121,'DDR5-6400','Intel Graphics',1.9,''],
-  ['245K','U2','U5',6,8,4.2,5.2,3.6,4.6,5.2,26,24,125,159,'DDR5-6400','Intel Graphics',1.9,'KF'],
-  ['265','U2','U7',8,12,2.4,5.2,1.8,4.6,5.3,36,30,65,182,'DDR5-6400','Intel Graphics',1.95,'F'],
-  ['265K','U2','U7',8,12,3.9,5.4,3.3,4.6,5.5,36,30,125,250,'DDR5-6400','Intel Graphics',2.0,'KF'],
-  ['285','U2','U9',8,16,2.5,5.4,1.9,4.6,5.6,40,36,65,182,'DDR5-6400','Intel Graphics',2.0,''],
-  ['285K','U2','U9',8,16,3.7,5.5,3.2,4.6,5.7,40,36,125,250,'DDR5-6400','Intel Graphics',2.0,''],
-  ['250KPLUS','U2P','U5',6,12,4.2,5.3,3.3,4.6,5.3,30,30,125,159,'DDR5-7200','Intel Graphics',1.9,'KF'],
-  ['270KPLUS','U2P','U7',8,16,3.7,5.4,3.2,4.7,5.5,40,36,125,250,'DDR5-7200','Intel Graphics',2.0,'']
-];
-// F 모델 중 기본 전력이 다른 예외 (i3 F: 58W)
-const F_POWER = {'12100F':58,'13100F':58,'14100F':58}; // ARK 확인
-// ARK 개별 페이지 재확인 완료 모델 (담당자가 확인 후 추가)
-// 2026-11-05 Intel 공식 사양 페이지(intel.com/products/sku) 개별 대조 완료
-const ARK_VERIFIED = new Set(['12100','12100F','12400','12500','12600','12600K','12700','12700K','12900','12900K',
-  '13100','13100F','13400','13500','13600K','13900','13900K',
-  '14100','14100F','14400','14500','14600K','14700','14700K','14900','14900K',
-  '225','235','245','245K','265','265K','285','285K','250KPLUS','270KPLUS']);
-
+const GEN={};   // 사양 데이터는 specs.json(내장 폴백 포함)에서 채움 — applySpecs()
 const DB = {};
-BASE.forEach(r=>{
-  const [model,gen,tier,p,e,pb,pt,eb,et,max,l2,l3,bp,mtp,mem,gpu,gf,der]=r;
-  const ent={model,gen,tier,p,e,t:(/^U2/.test(gen)?p+e:p*2+e),pb,pt,eb,et,max,l2,l3,bp,mtp,mem,gpu,gf,k:/K$/.test(model),ht:!/^U2/.test(gen)};
-  ent.disp=model.replace(/K?F?PLUS$/,m=>m.replace('PLUS','')+' Plus');
-  DB[model]=ent;
-  if(der==='F'){ DB[model+'F']={...ent,model:model+'F',disp:model+'F',gpu:null,bp:F_POWER[model+'F']||bp}; }
-  if(der==='KF'){ const fm=/PLUS$/.test(model)?model.replace('KPLUS','KFPLUS'):model+'F'; DB[fm]={...ent,model:fm,disp:fm.replace(/K?F?PLUS$/,m=>m.replace('PLUS','')+' Plus'),gpu:null}; } // 14600K → 14600KF, 250K Plus → 250KF Plus
-});
-// 10세대 (구세대 형식). 2026-11-06 Intel 공식 사양 페이지(sku/203474) 대조: 14nm · 4C/8T · 3.70/4.40GHz · 6MB · 65W · DDR4-2666 · 128GB · 2채널 · PCIe 3.0 16레인 · LGA1200 · ECC 미지원
-const LEGACY_BASE=[
-  {model:'10105F',gen:10,tier:'i3',p:4,e:0,t:8,pb:3.7,max:4.4,cache:6,bp:65,mem:'DDR4-2666',gpu:null,gf:null,k:false,ht:true,url:'https://www.intel.com/content/www/us/en/products/sku/203474/intel-core-i310105f-processor-6m-cache-up-to-4-40-ghz/specifications.html'}
-];
-LEGACY_BASE.push({model:'10980XE',gen:'X10',tier:'i9',p:18,e:0,t:36,pb:3.0,max:4.8,cache:24.75,bp:165,mem:'DDR4-2933',ch:4,gpu:null,gf:null,k:true,ht:true,kwx:['익스트림에디션','Extreme Edition'],
-  url:'https://www.intel.com/content/www/us/en/products/sku/198017/intel-core-i910980xe-extreme-edition-processor-24-75m-cache-3-00-ghz/specifications.html',
-  notes:[
-    {sev:'ask',t:'최대 클럭 · 공식 표기 2가지',d:'Intel 공식: Max Turbo 4.6GHz, Turbo Boost Max 3.0 4.8GHz. 12세대 이후 등록본처럼 가장 높은 값 4.8GHz를 넣었습니다. 4.6GHz로 쓰는 방식이면 알려 주세요'},
-    {sev:'ask',t:'10세대 Core X · 형식 제안',d:'X 시리즈(HEDT)는 일반 10세대와 소켓·메모리 채널이 달라 첫 항목을 10세대 Core X로 구분했습니다(제안). 오버클럭 지원·내장그래픽 미탑재는 Intel 사양 페이지에 항목이 없어 X 시리즈 일반 특성으로 적었으니 확인하세요'}
-  ]});
-LEGACY_BASE.forEach(r=>{ DB[r.model]={...r,disp:r.model,legacy:true,chk:'ark'}; });
-ARK_VERIFIED.add('10105F'); ARK_VERIFIED.add('10980XE');
-Object.values(DB).forEach(d=>{ if(!d.legacy) d.chk = ARK_VERIFIED.has(d.model)?'ark':'seed'; });
 const arkURL = m => `https://www.intel.com/content/www/us/en/search.html#q=${encodeURIComponent(m)}`;
 
 /* =========================================================
@@ -770,14 +730,7 @@ function genSummary(ent, cooler){
    - 시리즈 표기(6700P)는 등록본 형식에 따라 모델 번호 앞 두 자리로 만듦 (공식 페이지에는 시리즈명 표기 없음)
    - 새 모델은 아래에 한 줄 추가. DB에 없는 서버 모델은 중요요약 값을 만들지 않음
    ========================================================= */
-const XEON6_COMMON={cn:'그래니트 래피즈',cnEn:'Granite Rapids',socket:'LGA4710',proc:'Intel 3',scal:'2S',upi:'4링크(24GT/s)',mem:'DDR5-6400/MRDIMM-8800',ch:8,maxmem:'4TB',ecc:true,pcie:'5.0',lanes:88,amx:true,acc:'QAT·DLB·DSA·IAA',chk:'ark'};
-const SERVER_DB={
-  '6747P':{...XEON6_COMMON,cores:48,threads:96,base:2.7,allcore:3.8,max:3.9,l3:288,tdp:330,url:'https://www.intel.com/content/www/us/en/products/sku/241825/intel-xeon-6747p-processor-288m-cache-2-70-ghz/specifications.html'},
-  '6767P':{...XEON6_COMMON,cores:64,threads:128,base:2.4,allcore:3.6,max:3.9,l3:336,tdp:350,pk:'PK8072006269900',url:'https://www.intel.com/content/www/us/en/products/sku/241845/intel-xeon-6767p-processor-336m-cache-2-40-ghz/specifications.html'}
-};
-/* Xeon 스케일러블 3세대(아이스레이크-SP) — Intel 공식 사양 페이지 대조 (2026-11-06). 형식은 담당자가 제시한 예시 기준(제안) */
-SERVER_DB['5320']={fam:'gold3',brand:'Intel® Xeon® Gold',tier:'골드',gen:'3세대',cn:'아이스레이크-SP',cnEn:'Ice Lake',cnKw:['아이스레이크','아이스레이크-SP'],socket:'LGA4189',proc:'10nm',cores:26,threads:52,base:2.2,max:3.4,l3:39,tdp:185,scal:'2S',upi:'3링크(11.2GT/s)',mem:'DDR4-2933',ch:8,maxmem:'6TB',ecc:true,pcie:'4.0',lanes:64,feat:'Optane/SGX/DL Boost 지원',chk:'ark',url:'https://www.intel.com/content/www/us/en/products/sku/215285/intel-xeon-gold-5320-processor-39m-cache-2-20-ghz/specifications.html'};
-Object.keys(SERVER_DB).forEach(m=>{ SERVER_DB[m].model=m; if(!SERVER_DB[m].fam) SERVER_DB[m].series=m.slice(0,2)+'00P'; });
+const SERVER_DB={};
 /* 서버 키워드 규칙 (담당자 확정, 순서 고정):
    모델명, Xeon 모델명, Xeon모델명, 인텔 오더코드(PK…), 영문 코드네임, 한글 코드네임(붙임), N코어, 서버CPU, 인텔, 제온, 제온6, 소켓 */
 function genXeonKeywords(e, oldKw){
@@ -785,7 +738,7 @@ function genXeonKeywords(e, oldKw){
   const pkOld=old.find(k=>/^PK\d{8,}$/i.test(k));
   const pk=e.pk||(pkOld?pkOld.toUpperCase():null);
   const out=(e.fam==='gold3'
-    ? [e.model,'Xeon'+e.model,'제온'+e.model,pk,'인텔','intel','제온','Xeon',e.tier,e.brand.replace(/^.*Xeon®\s*/,''),e.gen,...e.cnKw,e.socket]
+    ? [e.model,'Xeon'+e.model,'제온'+e.model,pk,'인텔','intel','제온','Xeon',e.tier,e.tierEn||e.brand.replace(/^.*Xeon®\s*/,''),e.gen,...e.cnKw,e.socket]
     : [e.model,'Xeon '+e.model,'Xeon'+e.model,pk,e.cnEn,e.cn.replace(/\s/g,''),e.cores+'코어','서버CPU','인텔','제온','제온6',e.socket]).filter(Boolean);
   const low=out.map(x=>x.toLowerCase().replace(/\s/g,''));
   const foreign=[], extra=[];
@@ -800,7 +753,7 @@ function genXeonKeywords(e, oldKw){
 function serverCooler(I){
   if(I.cooler==='in') return {state:'in',text:'포함',why:'담당자 지정'};
   if(I.cooler==='out') return {state:'out',text:'미포함',why:'담당자 지정'};
-  if(/트레이|tray/i.test(I.sub||'')) return {state:'out',text:'미포함',why:'부가제목에 트레이(Tray) 상품 표기'};
+  if(/트레이|tray/i.test((I.sub||'')+' '+(I.name||''))) return {state:'out',text:'미포함',why:'부가제목·상품명에 트레이(Tray) 표기'};
   return {state:'unk',text:null,why:'부가제목에 트레이(Tray) 표기가 없어 쿨러 동봉 여부를 확정할 수 없음'};
 }
 function genServerSummary(e,cooler){
@@ -887,7 +840,7 @@ function processCpu(I){
   // (c) 서버 Processor 형식 내부 오류 (형식 자체는 정상으로 인정)
   const specG=P.groups.find(g=>g.kind==='spec');
   if(P.isServerFmt){
-    if(!specG) ask('서버 형식 괄호 누락',`${C('(xC, yT, zM Cache, a.bc GHz)')} 괄호가 없음`);
+    if(!specG){ if(!sent) ask('서버 형식 괄호 누락',`${C('(xC, yT, zM Cache, a.bc GHz)')} 괄호가 없음`); }
     else{
       const sm=specG.text.match(SERVER_SPEC_RE);
       if(!sm) ask('서버 형식 표기 확인',`${C(specG.text)} — 기준 ${C('24C, 48T, 144M Cache, 2.40 GHz')}`);
@@ -929,7 +882,7 @@ function processCpu(I){
   // (f) DB 조회 + 현재 중요요약 대조
   if(ent){
     (ent.notes||[]).forEach(n=>checks.push(n));
-    checks.push({sev:'ok',t:'사양 DB 등록 모델',d:`${C(ent.model)} — ${ent.chk==='ark'?'Intel 공식 사양 페이지 개별 대조 완료':'Intel 공식 페이지 개별 대조 전 (등록 전 확인 권장)'}`});
+    checks.push(specStateCheck('desktop_cpu',ent,'사양 DB 등록 모델'));
     if(I.spec){
       const cores=(I.spec.match(/(\d+)\s*코어/)||[])[1], thr=(I.spec.match(/스레드\s*:?\s*(\d+)/)||I.spec.match(/(\d+)\s*스레드/)||[])[1];
       const l3=(I.spec.match(/L3[^|:]*:?\s*(\d+(?:\.\d+)?)\s*MB/i)||[])[1];
@@ -940,7 +893,7 @@ function processCpu(I){
       if(other.length) checks.push({sev:'err',t:'중요요약에 다른 모델 혼입 의심',d:`${other.map(C).join(' ')}`});
     }
   }else{
-    if(sent) checks.push({sev:'ok',t:'서버 사양 DB 등록 모델',d:`${C(sent.model)} — Intel 공식 사양 페이지 개별 대조 완료`});
+    if(sent) checks.push(specStateCheck('server_cpu',sent,'서버 사양 DB 등록 모델'));
     else checks.push({sev:'unk',t:'사양 DB 미등록 모델',d:`${C(P.rawModel||P.model)} — 중요요약 사양값을 생성하지 않음. Intel ARK 확인 후 DB 추가 필요`});
   }
 
@@ -1274,11 +1227,121 @@ function processNbGeneric(I,P,checks,gen){
    값은 상품명에 있는 것만 사용 (PC5 번호는 속도×8, REG=RDIMM은 규격상 계산). 원본에 없는 항목은 현재 중요요약에서 가져오거나 [확인 필요]
    ========================================================= */
 /* 담당자 등록본에서 확인된 모듈 (파트 번호·CL·전압·랭크는 상품명에 없어 등록본으로만 채움) */
-const MEM_REG=[
-  {brand:'삼성메모리',type:'DDR4',cap:4,speed:3200,nb:true,part:'M471A5244CB0-CWE',cl:22,v:'1.2V',rank:'1Rx16'}
-];
-const SODIMM_PIN={DDR2:200,DDR3:204,DDR4:260,DDR5:262};
+const MEM_REG=[];
+const SODIMM_PIN={};
+
+/* =========================================================
+   사양 데이터 로더 · 검증 상태 · 이 브라우저 임시 변경
+   - 사양 값은 specs.json(공통 파일)에 있고, index.html 안에는 같은 내용의 내장 폴백이 들어 있음
+   - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
+   - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
+   ========================================================= */
+const BUILD={ver:'v2.1',id:'20261106-1830'};
+const SPEC_STATUS={
+  extracted:{label:'입력에서 추출',tone:'ask'},
+  ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
+  external_candidate:{label:'외부 자료 후보',tone:'warn'},
+  verified:{label:'검증 완료',tone:'ok'},
+  conflict:{label:'충돌·확인 불가',tone:'ask'}
+};
+const SPEC_KINDS={desktop_cpu:'데스크톱 CPU',server_cpu:'서버 CPU',memory_registry:'메모리 등록본'};
+var SPECS_EMBEDDED_VER='', SPECS_BASE_DATA=null;
+const SPECS_INFO={origin:'내장 폴백',version:'',fetched:false,error:'',problems:[]};
+const LS_SPECS='cno.specs.local.v1';
+const clone=o=>JSON.parse(JSON.stringify(o));
+function specMap(kind){ return kind==='desktop_cpu'?DB:kind==='server_cpu'?SERVER_DB:null; }
+function specKey(kind,e){ return kind==='memory_registry'?e.part:(e.model||''); }
+/* ---- 형식 검사: 구조·자료형·단위·일관성만 본다 (공식 사양 대조 아님) ---- */
+const REQ={
+  desktop_cpu:['model','gen','tier','p','e','pb','max','bp','mem'],
+  server_cpu:['model','cores','threads','base','max','l3','tdp','socket','mem','ch','maxmem','pcie','lanes','scal','upi','cn','proc'],
+  memory_registry:['brand','type','cap','speed','part','cl','v','rank']
+};
+function formatCheck(kind,e){
+  const out=[], bad=(m)=>out.push(m), num=(k,lo,hi,u)=>{ const x=e[k]; if(x===undefined||x===null) return; if(typeof x!=='number'||!isFinite(x)) bad(`${k}: 숫자가 아님 (${JSON.stringify(x)})`); else if(x<lo||x>hi) bad(`${k}: ${x}${u||''} — 일반 범위(${lo}~${hi}${u||''}) 밖`); };
+  if(!REQ[kind]) return ['알 수 없는 종류: '+kind];
+  REQ[kind].forEach(k=>{ if(e[k]===undefined||e[k]===null||e[k]==='') { if(!(kind==='desktop_cpu'&&k==='e'&&e.e===0)) bad(`필수 항목 누락: ${k}`); } });
+  if(kind==='desktop_cpu'){
+    if(e.gen!==undefined && !GEN[e.gen]) bad(`gen: 세대 규칙 없음 (${e.gen}) — 새 세대는 코드 규칙 추가가 필요`);
+    num('p',0,64);num('e',0,64);num('pb',0.5,6,'GHz');num('pt',0.5,6.5,'GHz');num('max',0.5,7,'GHz');num('bp',10,300,'W');num('mtp',10,500,'W');num('l3',1,200,'MB');
+    if(typeof e.p==='number'&&typeof e.e==='number'&&typeof e.t==='number'&&e.t<e.p+e.e) bad(`스레드(${e.t})가 코어 수(${e.p+e.e})보다 적음`);
+    if(typeof e.pb==='number'&&typeof e.max==='number'&&e.pb>e.max) bad('기본 클럭이 최대 클럭보다 큼');
+  }else if(kind==='server_cpu'){
+    num('cores',1,512);num('threads',1,1024);num('base',0.5,6,'GHz');num('max',0.5,7,'GHz');num('l3',1,1024,'MB');num('tdp',10,800,'W');num('ch',1,24);num('lanes',0,256);
+    if(typeof e.cores==='number'&&typeof e.threads==='number'&&(e.threads<e.cores||e.threads>e.cores*2)) bad(`스레드(${e.threads})와 코어(${e.cores})의 비율이 1:1~1:2가 아님`);
+    if(typeof e.base==='number'&&typeof e.max==='number'&&e.base>e.max) bad('기본 클럭이 최대 클럭보다 큼');
+    if(e.socket && !/^LGA\d{3,4}$/.test(e.socket)) bad(`socket 형식(LGAnnnn) 아님: ${e.socket}`);
+    if(e.pcie && !/^\d(\.\d)?$/.test(String(e.pcie))) bad(`pcie 형식 아님: ${e.pcie}`);
+    if(e.fam && !(e.brand&&e.tier&&e.gen&&e.cnKw)) bad('fam 지정 시 brand·tier·gen·cnKw 필요');
+  }else if(kind==='memory_registry'){
+    if(e.type && !/^DDR[2345]$/.test(e.type)) bad(`type: DDR2~5 아님 (${e.type})`);
+    num('cap',1,2048,'GB');num('speed',400,12800);num('cl',1,100);
+    if(e.part && !/^[A-Za-z0-9][A-Za-z0-9\-]{5,}$/.test(e.part)) bad(`part: 파트 번호 형식이 아님 (${e.part})`);
+    if(e.v && !/^\d(\.\d+)?V$/.test(e.v)) bad(`v: 전압 형식(예 1.2V) 아님 (${e.v})`);
+  }
+  return out;
+}
+function officialUrlOk(u){ try{ const x=new URL(u); return x.protocol==='https:' && /(^|\.)intel\.com$/.test(x.hostname); }catch(e){ return false; } }
+/* ---- 로컬(이 브라우저) 변경 ---- */
+function localLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS_SPECS)||'null'); if(j&&j.v===1&&j.entries) return j; }catch(e){} return {v:1,entries:{},log:[]}; }
+let LOCAL_OK=true;
+function localSave(L){ try{ localStorage.setItem(LS_SPECS,JSON.stringify(L)); LOCAL_OK=true; return true; }catch(e){ LOCAL_OK=false; return false; } }
+function applyLocal(){
+  const L=localLoad(); let n=0;
+  Object.values(L.entries).forEach(le=>{
+    const e=clone(le.entry); e.origin='local';
+    if(le.kind==='memory_registry'){ const i=MEM_REG.findIndex(x=>x.part===e.part); if(i>=0) MEM_REG[i]=e; else MEM_REG.push(e); }
+    else{ const m=specMap(le.kind); if(m){ m[le.key]=e; } }
+    n++; });
+  SPECS_INFO.localCount=n;
+}
+function applySpecs(S,origin){
+  SPECS_BASE_DATA=S;
+  [GEN,DB,SERVER_DB,SODIMM_PIN].forEach(o=>Object.keys(o).forEach(k=>delete o[k])); MEM_REG.length=0;
+  Object.assign(GEN,clone(S.generations||{})); Object.assign(DB,clone(S.desktop_cpu||{})); Object.assign(SERVER_DB,clone(S.server_cpu||{})); Object.assign(SODIMM_PIN,S.sodimm_pin||{});
+  (S.memory_registry||[]).forEach(r=>MEM_REG.push(clone(r)));
+  [DB,SERVER_DB].forEach(o=>Object.values(o).forEach(d=>{ d.origin='shared'; }));
+  MEM_REG.forEach(d=>{ d.origin='shared'; });
+  SPECS_INFO.problems=[];
+  Object.entries(DB).forEach(([k,e])=>{ const f=formatCheck('desktop_cpu',e); if(f.length) SPECS_INFO.problems.push('데스크톱 '+k+': '+f.join(' / ')); });
+  Object.entries(SERVER_DB).forEach(([k,e])=>{ const f=formatCheck('server_cpu',e); if(f.length) SPECS_INFO.problems.push('서버 '+k+': '+f.join(' / ')); });
+  SPECS_SRC=S.sources||{};
+  applyLocal();
+  SPECS_INFO.origin=origin; SPECS_INFO.version=S.version||''; SPECS_INFO.updated=S.updated||'';
+}
+let SPECS_SRC={};
+const specRec=e=>(e&&e.rec)||{status:'external_candidate',source:null,checkedAt:null,note:'검증 기록 없음'};
+function specSrcUrl(e){ const r=specRec(e); return r.sourceUrl||(r.source&&SPECS_SRC[r.source]&&SPECS_SRC[r.source].url)||null; }
+/* 결과 화면에 쓰는 사양 상태 판정 */
+function specGate(e){
+  if(!e) return null; const r=specRec(e), url=specSrcUrl(e), loc=e.origin==='local';
+  const st=SPEC_STATUS[r.status]||SPEC_STATUS.external_candidate;
+  let level='ok', text=st.label;
+  if(r.status==='verified'){ level='ok'; }
+  else if(r.status==='conflict'){ level='conf'; }
+  else if(loc){ level='pend'; text=st.label+' · 검토 대기 (승인 전)'; }
+  else{ level='cand'; }
+  return {level,text,status:r.status,label:st.label,url,rec:r,local:loc};
+}
+function specStateCheck(kind,e,label){
+  const g=specGate(e), id=esc(specKey(kind,e)), btn=`<button type="button" class="linkbtn" onclick="specReport('${kind}','${id}')">이 모델 오류 신고·재검증</button>`;
+  const when=g.rec.checkedAt?` · ${esc(g.rec.checkedAt)} 확인`:'';
+  const link=g.url?`<a href="${esc(g.url)}" target="_blank" rel="noopener">출처 페이지 ↗</a>`:'출처 URL 없음';
+  if(g.level==='ok') return {sev:'ok',t:`${label} · 검증 완료`,d:`${C(specKey(kind,e))} — ${link}${when} · ${esc(g.rec.method||'')}${g.rec.note?'<br>'+esc(g.rec.note):''}<br>${btn}`};
+  if(g.level==='cand') return {sev:'warn',t:`${label} · 출처 기록 없음 (후보)`,d:`${C(specKey(kind,e))} — 값은 DB에 있지만 모델별 출처 URL·값 대조 기록이 없어 검증 완료로 보지 않습니다. ${esc(g.rec.note||'')}<br>${btn}`};
+  if(g.level==='pend') return {sev:'ask',t:`${label} · 검토 대기 — 확정 출력 아님`,d:`${C(specKey(kind,e))} — ${esc(g.label)}. 이 브라우저에만 있는 값입니다. 출처 페이지(${link})와 모델명·값을 직접 대조하고 승인하기 전에는 확정 출력으로 쓰지 마세요.<br>${btn}`};
+  return {sev:'ask',t:`${label} · 충돌·확인 불가 표시됨`,d:`${C(specKey(kind,e))} — ${esc(g.rec.note||'담당자가 사양 충돌을 신고함')}. 값이 맞는지 확인되기 전에는 확정 출력으로 쓰지 마세요.<br>${btn}`};
+}
+function specBanner(gates){ const bad=gates.filter(g=>g&&(g.level==='pend'||g.level==='conf')); if(!bad.length) return '';
+  return `<div class="nm-note" role="alert"><b>확정 출력 아님</b> — ${bad.map(g=>esc(g.label)+(g.local?' (이 브라우저 임시)':'')).join(', ')} 사양을 사용한 결과입니다. 출처 대조·승인 후 사용하세요.</div>`; }
+(function initSpecs(){
+  let S=null; try{ S=JSON.parse(document.getElementById('specsEmbedded').textContent); }catch(e){}
+  if(!S||!S.schema){ SPECS_INFO.error='내장 사양 데이터를 읽지 못함'; return; }
+  SPECS_EMBEDDED_VER=S.version; applySpecs(S,'내장 폴백');
+})();
 function memReg(R){ return MEM_REG.find(e=>e.nb===!!R.notebook && e.brand===R.brand && e.type===R.type && e.cap===R.cap && e.speed===R.speed)||null; }
+/* 등록본 모듈은 브랜드·DDR·용량·속도가 같다는 이유만으로 확정하지 않는다: 파트 번호가 상품명·기존 키워드·기존 중요요약에 있을 때만 'confirmed', 아니면 'candidate' */
+function memIdent(R,reg){ if(!reg) return null; const pt=(reg.part||'').toUpperCase(); return (pt&&((R.part||'').toUpperCase()===pt||(R.kwText||'').includes(pt)))?'confirmed':'candidate'; }
 function parseRamName(name){
   const N=(name||'').replace(/\s+/g,' ').trim(); const o={brand:null,type:null,speed:null,pc:null,cl:null,cap:null,count:null,server:false,ecc:false,reg:false,lrdimm:false,desktop:false,notebook:false,part:null,ok:false};
   const bm=N.match(/^\[([^\]]{1,20})\]/); o.brand=bm?bm[1]:null;
@@ -1334,7 +1397,7 @@ function processRam(I){
     if(lm && lm[1].length<=12 && !/\s|DDR|\d{3,}/i.test(lm[1]) && !/^(노트북|데스크탑|데스크톱|서버용|서버)$/.test(lm[1])){ lead=lm[1]; nm=(b0+rest.slice(lm[0].length)).trim(); } }
   gen.name=nm;
   const R=parseRamName(nm); if(lead) R.brand=lead; else if((I.brand||'').trim() && !/[^A-Za-z0-9가-힣\s®™]/.test(I.brand)) { R.brand=I.brand.trim(); R.brandFromField=true; } else if(!R.brand && (I.maker||'').trim()) { R.brand=I.maker.trim(); R.brandFromMaker=true; }
-  R.maker=(I.maker||'').trim();
+  R.maker=(I.maker||'').trim(); R.kwText=((I.kw||'')+' '+(I.spec||'')+' '+nm).toUpperCase();
   if(!R.ok){ checks.push({sev:'unk',t:'메모리 규격을 읽지 못함',d:'상품명에서 DDR 세대와 속도를 찾지 못해 키워드·중요요약을 만들지 않음'}); return {checks,gen,R}; }
   if(R.brand){ gen.brand=R.brand; if(lead) checks.push({sev:'ask',t:'브랜드 분리',d:`상품명 앞의 ${C(lead)}를 브랜드로 옮기고 상품명에서 뺐습니다. 제조사는 ${C(R.maker||'-')}입니다`}); else if(R.brandFromField) checks.push({sev:'ok',t:'브랜드 현재값 사용',d:C(R.brand)}); else if(R.brandFromMaker) checks.push({sev:'ask',t:'브랜드 = 제조사',d:'상품명에 브랜드가 따로 없어 제조사명을 브랜드로 제안했습니다'}); }
   else checks.push({sev:'unk',t:'브랜드 확인불가',d:'상품명 앞의 [브랜드] 표기가 없어 브랜드를 만들지 않음'});
@@ -1360,7 +1423,9 @@ function processRam(I){
     if(!oo.length&&!gg.length) checks.push({sev:'ok',t:'키워드 현재값 일치',d:'현재 등록값과 제안값의 항목이 같음'});
     else{ if(oo.length) checks.push({sev:'warn',t:`키워드 현재값에만 있는 항목 · ${oo.length}건`,d:oo.map(C).join(' ')}); if(gg.length) checks.push({sev:'warn',t:`키워드 제안에만 있는 항목 · ${gg.length}건`,d:gg.map(C).join(' ')}); } }
   if(g.nb){ const reg=memReg(R);
-    if(reg) checks.push({sev:'ask',t:'등록본 후보 · 파트 번호 확인 필요',d:`브랜드·DDR 세대·용량·속도가 등록본과 같아 ${C(reg.part)}의 파트 번호·CL·전압·랭크를 가져왔습니다. 같은 사양의 다른 모듈일 수 있으니 모듈 라벨의 파트 번호와 대조하세요`});
+    if(reg){ const id=memIdent(R,reg), sg=specGate(reg);
+      if(id==='confirmed') checks.push({sev:'ok',t:'등록본 모듈 일치 · 파트 번호 확인됨',d:`${C(reg.part)} — 상품명·기존 키워드에 같은 파트 번호가 있어 등록본의 CL·전압·랭크를 사용했습니다 (등록본 상태: ${esc(sg.label)})`});
+      else checks.push({sev:'ask',t:'등록본 후보 · 파트 번호 확인 필요 (확정 아님)',d:`브랜드·DDR 세대·용량·속도가 등록본과 같아 ${C(reg.part)}의 파트 번호·CL·전압·랭크를 <b>후보로</b> 넣었습니다. 파트 번호가 상품명·기존 키워드에 없어 같은 모델이라고 확정할 수 없습니다. 모듈 라벨·공급사 자료의 파트 번호와 대조 후 사용하세요 (등록본 상태: ${esc(sg.label)})`}); }
     else checks.push({sev:'ask',t:'파트 번호·CL·전압·랭크 확인 필요',d:'상품명에 없어 만들지 않았습니다(키워드의 파트 번호는 빠짐). 모듈 라벨이나 제조사 자료를 보고 채우거나, 현재 중요요약을 붙여 넣으면 가져옵니다. SO-DIMM 핀 수는 DDR 세대 규격(DDR4=260핀)이고 ECC는 상품명에 없어 Non-ECC로 적었습니다'}); }
   checks.push({sev:'ask',t:'RAM 키워드는 규칙 확정 전 제안',d:'파트 번호 → 브랜드 → DDR 세대 → DDR세대-속도 → PC 번호 → 용량 → CL → ECC·RDIMM 순서입니다. 브랜드의 다른 표기(한글·영문)는 상품명에 없어 넣지 않았고, 제조사명은 브랜드와 다를 때만 넣습니다. 등록 전 확인하세요'});
   return {checks,gen,R};
@@ -1442,7 +1507,13 @@ function processSet(I,cat){
 /* 상품명 기호 점검: 상품명은 검색·이미지명과 연결되므로 검색에 불필요한 기호를 줄이도록 안내 (자동 수정 없음) */
 /* 공통 검사 (기준 문서 3-2): HTML 엔티티 깨짐 · 특수문자 오입력 · 중복 공백 · 단위 혼용 */
 function hygieneChecks(I){
-  const out=[]; const F={상품명:I.name,키워드:I.kw,중요요약:I.spec,부가제목:I.sub};
+  const out=[];
+  if(I.ocr && I.name){
+    if(I.maker && (/^[\d\W_]+$/.test(I.maker.trim())||I.maker.trim().length<2)) out.push({sev:'ask',t:'캡처 인식 의심 · 제조사',d:`${C(I.maker)} — 제조사로 보기 어려운 글자입니다. 원본과 대조하세요`});
+    if(unbalanced(I.name)) out.push({sev:'ask',t:'캡처 인식 의심 · 괄호가 맞지 않음',d:`${C(I.name)} — 캡처가 오른쪽에서 잘렸거나 글자를 잘못 읽었을 수 있습니다. 원본 상품명과 대조하세요`});
+    const u=[...(I.name.match(/\b\d{3,4}\s*구성/g)||[]),...(I.name.match(/\b(?:SSD|HDD)\s+\d{3,4}\b(?!\s*(?:GB|TB))/gi)||[])];
+    if(u.length) out.push({sev:'ask',t:'캡처 인식 의심 · 용량 단위',d:`${u.map(C).join(' ')} — 용량 뒤의 단위(GB·TB)가 숫자로 읽혔을 수 있습니다 (예: 32GB → 3268). 원본과 대조하세요. CNO가 값을 추측해 고치지는 않습니다`});
+  } const F={상품명:I.name,키워드:I.kw,중요요약:I.spec,부가제목:I.sub};
   const ENT={'&#8209;':'-','&#8211;':'–','&#8482;':'™','&amp;':'&','&nbsp;':' '};
   Object.entries(F).forEach(([k,v])=>{ if(!v) return;
     const es=(v.match(/&#?\w{2,6};/g)||[]).filter((x,i,a)=>a.indexOf(x)===i);
@@ -1479,6 +1550,12 @@ function detectCategory(I){
 }
 const BMAP={err:['b-err','오류'],ask:['b-ask','확인 요청'],warn:['b-warn','경고'],unk:['b-unk','확인불가'],ok:['b-ok','확인']};
 const ORDER={err:0,ask:1,warn:2,unk:3,ok:4};
+function sumTag(e,sum){ const gt=specGate(e);
+  if(/\[확인 필요\]/.test(sum||'')) return ['ask','쿨러 확인 필요'];
+  return gt.level==='ok'?['ok','검증 완료 · 출처 기록 있음']:gt.level==='cand'?['ask','출처 기록 없음 · 후보']:gt.level==='pend'?['ask','검토 대기 · 확정 아님']:['ask','충돌·확인 불가']; }
+function srcLine(kind,e,disp){ const g=specGate(e), where=e.origin==='local'?'이 브라우저 임시 저장 (공통 specs.json에는 반영되지 않음)':'공통 사양 파일';
+  const a=g.url?`<a href="${esc(g.url)}" target="_blank" rel="noopener">출처 페이지 ↗</a>`:'출처 URL 없음';
+  return `<div class="src">사양 상태: <b>${esc(g.label)}</b>${g.level==='pend'?' · 승인 전':''} · ${a}${g.rec.checkedAt?' · '+esc(g.rec.checkedAt)+' 확인':''} · 저장 위치: ${where}<br><button type="button" class="linkbtn" onclick="specReport('${kind}','${esc(specKey(kind,e))}')">이 모델 오류 신고·재검증</button></div>`; }
 function renderChecks(list){
   list.sort((a,b)=>ORDER[a.sev]-ORDER[b.sev]);
   return `<div class="checks"><div class="card-h">검증 결과 · ${list.length}건</div>`+
@@ -1547,8 +1624,10 @@ function run(){
     g+=NAME_NOTE;
     g+=genRow('brand','브랜드',r.gen.brand,'상품명에 [브랜드]가 없어 만들지 않음',r.gen.brand?['ask','상품명 기준 · 확인 요청']:['unk','확인불가']);
     g+=genRow('sub','부가제목',r.gen.sub,'부가제목이 없어 비워 둠',r.gen.sub?['ok','캡처·현재값 유지']:['unk','현재값 유지']);
-    g+=genRow('kw','키워드',r.gen.kw,'규격을 읽지 못해 키워드를 만들지 않음',r.gen.kw?['ask','제안 · 규칙 확정 전']:['unk','생성 안 함']);
-    g+=genRow('sum','중요요약설명',r.gen.sum,'규격을 읽지 못해 중요요약을 만들지 않음',r.gen.sum?(/확인 필요\]/.test(r.gen.sum)?['ask','일부 확인 필요']:['ok','상품명 기반 · 등록본 형식']):['unk','생성 안 함']);
+    const rg=r.R&&r.R.notebook?memReg(r.R):null, cand=rg&&memIdent(r.R,rg)==='candidate';
+    g=specBanner([rg&&specGate(rg)])+g;
+    g+=genRow('kw','키워드',r.gen.kw,'규격을 읽지 못해 키워드를 만들지 않음',r.gen.kw?(cand?['ask','후보 · 파트 번호 확인']:['ask','제안 · 규칙 확정 전']):['unk','생성 안 함']);
+    g+=genRow('sum','중요요약설명',r.gen.sum,'규격을 읽지 못해 중요요약을 만들지 않음',r.gen.sum?(cand?['ask','후보 · CL·전압·랭크 확인']:/확인 필요\]/.test(r.gen.sum)?['ask','일부 확인 필요']:['ok','상품명 기반 · 등록본 형식']):['unk','생성 안 함']);
     K.innerHTML=renderChecks([...extra,...r.checks]);
   }else if(cat==='pc'||cat==='nb'){
     const r=processSet(I,cat);
@@ -1584,22 +1663,24 @@ function run(){
     g+=genRow('brand','브랜드',r.gen.brand,r.isServer?'서버 CPU 브랜드는 현재값 유지 (Intel® Xeon® Gold / Xeon® 6 / Xeon® W / Xeon® E 등)':'티어 판별 불가 — 모델명 확인',r.gen.brand?(r.isServer?['ask','규칙 기반 · 확인 요청']:['ok','규칙']):['unk','현재값 유지']);
     g+=genRow('sub','부가제목',r.gen.sub,'서버 CPU 부가제목은 공급 조건(Tray·리드타임·취소 규정)이라 현재값 유지',r.gen.sub?(/확인\]/.test(r.gen.sub)?['ask','쿨러 확인 필요']:['ok','규칙']):['unk','현재값 유지']);
     g+=genRow('kw','키워드',r.gen.kw,'사양 DB 미등록 모델 — 키워드를 추정 생성하지 않음',r.gen.kw?(r.isServer?['ask','규칙 기반 · 확인 요청']:['ok','규칙']):['unk','DB 미등록']);
-    g+=genRow('sum','중요요약설명',r.gen.sum,'사양 DB 미등록 모델 — 사양값을 만들지 않음 (Truth Protocol). Intel 공식 사양 확인 후 DB에 추가하면 생성됩니다.',r.ent?(r.ent.chk==='ark'?['ok','Intel 공식 사양 대조 완료']:['ask','공식 대조 전 · 등록 전 확인']):(r.sent?(/\[확인 필요\]/.test(r.gen.sum)?['ask','쿨러 확인 필요']:['ok','Intel 공식 사양 대조 완료']):['unk','DB 미등록']));
+    g+=genRow('sum','중요요약설명',r.gen.sum,'사양 DB 미등록 모델 — 사양값을 만들지 않음 (Truth Protocol). Intel 공식 사양 확인 후 DB에 추가하면 생성됩니다.',r.ent?sumTag(r.ent,r.gen.sum):(r.sent?sumTag(r.sent,r.gen.sum):['unk','DB 미등록']));
     if(r.ent){
       const e=r.ent, gg=GEN[e.gen];
-      src+=`<div class="src">사양 출처: Intel 공식 사양 · <b>${e.chk==='ark'?'이 모델의 공식 사양 페이지와 개별 대조 완료':'공식 페이지 개별 대조 전 (기본 모델 값에서 파생) — 등록 전 확인 권장'}</b> · <a href="${arkURL(e.model)}" target="_blank" rel="noopener">Intel에서 ${esc(e.disp)} 확인 ↗</a></div>`;
+      src+=srcLine('desktop_cpu',e,e.disp);
       src+=`<details><summary>DB 원본 값 보기</summary><table class="tbl">`+
         [['모델',e.disp],['세대/코드네임',`${gg.label} / ${gg.cn}`],['코어',e.e?`${e.p+e.e} (P${e.p}+E${e.e})`:e.p],['스레드',e.t],['클럭',`P ${e.pb}~${e.pt}${e.eb?` / E ${e.eb}~${e.et}`:''} / 최대 ${e.max} GHz`],['캐시',`L2 ${e.l2}MB / L3 ${e.l3}MB`],['전력',`${e.bp}W / ${e.mtp}W`],['메모리',`${e.mem} · 최대 ${gg.maxmem}GB`],['내장그래픽',e.gpu?`${e.gpu} (최대 ${e.gf}GHz)`:'미탑재']]
         .map(([a,b])=>`<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')+`</table></details>`;
     }
     if(r.sent){
       const e=r.sent;
-      src+=`<div class="src">사양 출처: Intel 공식 사양 · <b>이 모델의 공식 사양 페이지와 개별 대조 완료</b> · <a href="${e.url}" target="_blank" rel="noopener">Intel에서 ${esc(e.model)} 확인 ↗</a><br>시리즈 표기(${esc(e.series)} 시리즈)는 등록본 형식에 따라 모델 번호 앞 두 자리로 만들었습니다(공식 페이지에는 시리즈명 표기 없음).</div>`;
+      src+=srcLine('server_cpu',e,e.model)+(e.series?`<div class="src">시리즈 표기(${esc(e.series)} 시리즈)는 등록본 형식에 따라 모델 번호 앞 두 자리로 만들었습니다(공식 페이지에는 시리즈명 표기 없음).</div>`:'');
       src+=`<details><summary>DB 원본 값 보기</summary><table class="tbl">`+
         [['모델',e.model],['코드네임',e.cn],['소켓/공정',`${e.socket} / ${e.proc}`],['코어/스레드',`${e.cores} / ${e.threads}`],['클럭',`기본 ${e.base} / 올코어 터보 ${e.allcore} / 최대 ${e.max} GHz`],['캐시/TDP',`L3 ${e.l3}MB / ${e.tdp}W`],['소켓 구성/UPI',`최대 ${e.scal} / ${e.upi}`],['메모리',`${e.mem} · ${e.ch}채널 · 최대 ${e.maxmem}`],['PCIe',`${e.pcie} · ${e.lanes}레인`],['가속기',e.acc]]
         .map(([a,b])=>`<tr><td>${a}</td><td>${esc(b)}</td></tr>`).join('')+`</table></details>`;
     }
     K.innerHTML=renderChecks([...extra,...r.checks]);
+    if(!r.ent&&!r.sent&&/^[\w\-+]{3,}$/.test(r.P.model||'')) src+=`<div class="src">사양 DB에 없는 모델입니다. <button type="button" class="linkbtn" onclick="specPromptFor()">Claude 확인 요청문 복사</button> → Claude 채팅에서 받은 사양 블록을 <a href="#specMgr">사양 데이터 관리</a>에 붙여넣으면 '검토 대기'로 들어갑니다 (출처 대조·승인 후 확정).</div>`;
+    g=specBanner([r.ent&&specGate(r.ent),r.sent&&specGate(r.sent)])+g;
   }
   G.innerHTML=g; S.innerHTML=src;
   // 상태 요약: 색 + 텍스트 (오류 > 확인 요청 > 확인불가 > 완료)
@@ -1664,7 +1745,8 @@ function srvShapeBad(n){
   const nums=(n.replace(/\([^)]*\)/g,' ').match(/\b\d{4}[A-Z]{0,2}\b/g)||[]);
   return new Set(nums).size>1;
 }
-function nameScore(f){ if(!f||!f.name) return 99; return oddCount(f.name)*3+(f.nameOk===false?2:0)+(f.fix?1:0)+(srvShapeBad(f.name)?3:0); }
+function unbalanced(t){ t=t||''; return (t.split('[').length!==t.split(']').length)||(t.split('(').length!==t.split(')').length); }
+function nameScore(f){ if(!f||!f.name) return 99; return oddCount(f.name)*3+(f.nameOk===false?2:0)+(f.fix?1:0)+(srvShapeBad(f.name)?3:0)+(unbalanced(f.name)?3:0); }
 // 강조된 줄만 잘라 한 줄 모드로 다시 인식
 async function readBand(cv,b){
   const pad=10, x0=Math.max(0,b.x0-4), x1=Math.min(cv.width,b.x1+4);
@@ -1706,10 +1788,17 @@ function parseShotText(text){
   // 왼쪽 로고(intel.)가 같은 줄로 읽히거나 [인텔] 표기가 상품명에 딸려온 경우 정리
   { const lm=out.name.match(/^(?:\s*(?:intel|inte1|lntel)\.?\s*[|]?\s*)?[\[|(]?\s*인텔\s*[\]|)]\s*(.+)$/i);
     if(lm){ out.name=lm[1].trim(); if(!out.maker) out.maker='인텔'; } }
+  { const TIERS=['Silver','Gold','Platinum','Bronze'];   // Xeon 등급 단어가 깨진 경우(예: ilver → Silver). 등급 4개 중 글자 차이 2 이하로 하나만 가까울 때만 교정
+    const lev=(a,b)=>{ const d=[...Array(a.length+1)].map((_,i)=>[i]); for(let j=1;j<=b.length;j++) d[0][j]=j; for(let i=1;i<=a.length;i++) for(let j=1;j<=b.length;j++) d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return d[a.length][b.length]; };
+    out.name=out.name.replace(/(Xeon\s*®?\s*)([A-Za-z]{3,9})(?=\s+[0-9])/i,(m0,pre,w)=>{ if(TIERS.includes(w)||/^(E|W|Scalable)$/i.test(w)) return m0;
+      const c=TIERS.filter(t=>lev(w.toLowerCase(),t.toLowerCase())<=2); if(c.length!==1) return m0;
+      out.notes=out.notes||[]; out.notes.push({from:w,to:c[0]}); return pre.replace(/\s*®?\s*$/,'®')+' '+c[0]; }); }
   { const xm=out.name.match(/^(.{1,10}?)\s*(Xeon\b.*)$/i);   // 로고 조각이 앞에 붙은 Xeon 이름: "|ntelk Xeon® Gold …" → "Intel® Xeon® Gold …"
     if(xm && !/^Intel\s*®?$/i.test(xm[1].trim()) && /[^A-Za-z\s®]|^(?:int|inte|lnt|\|)/i.test(xm[1])){ out.notes=out.notes||[]; out.notes.push({from:xm[1].trim()+' Xeon',to:'Intel® Xeon'}); out.name='Intel® '+xm[2].replace(/^Xeon(?!®)\s*/i,'Xeon® ').replace(/^xeon/,'Xeon'); } }
   // 메모리 이름: DDR 글자가 숫자로 깨진 경우(예: DDR4 → 0084)와 끝 괄호 보정 — 보정한 사실은 화면에 확인 요청으로 표시
   out.notes=out.notes||[];
+  { const m1s=out.name.match(/\b1S(\d{2}[A-Z]\d{2,3}[A-Z0-9]*)\b/);   // 삼성 모니터 모델은 LS+숫자 2자리+영문+숫자 꼴 — 첫 글자 L이 1로 읽힌 경우(보정 사실은 확인 요청으로 표시)
+    if(m1s){ out.notes.push({from:m1s[0],to:'LS'+m1s[1]}); out.name=out.name.replace(m1s[0],'LS'+m1s[1]); } }
   // 모델 번호 끝자리 혼동(E↔6·8·F, 0↔O 등): 사양 DB에서 글자 혼동만으로 달라지는 모델이 딱 하나일 때만 제안
   if(typeof DB!=='undefined' && !/Processor/i.test(out.name)){
     const CONF=[['E','6'],['E','8'],['E','F'],['E','B'],['0','O'],['1','I'],['5','S'],['8','B'],['6','G'],['2','Z'],['X','K']];
@@ -1940,6 +2029,161 @@ const CATS=[
 $('presets').innerHTML=FEATURED.map(i=>presetBtn(PRESETS[i],i)).join('');
 $('presetsMore').innerHTML=PRESETS.map((p,i)=>FEATURED.includes(i)?'':presetBtn(p,i)).join('');
 function fill(i){ const p=PRESETS[i][1]; ['maker','brand','name','sub','kw','spec'].forEach(k=>$(k).value=p[k]||''); $('as').value=''; $('cooler').value=''; $('catSel').value=''; OCR_NOTE=false; OCR_FIX=null; OCR_KWDROP=0; $('more').open=!!(p.sub||p.kw||p.spec); run(); $('gen').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+
+/* =========================================================
+   사양 데이터 관리 UI · specs.json 불러오기 · 버전/빌드 표시
+   ========================================================= */
+const kstToday=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+const localId=(kind,key)=>kind+':'+key;
+function specStripMeta(e){ const x=clone(e); delete x.rec; delete x.history; delete x.origin; return x; }
+function specFill(kind,key,e){   // 규칙 계산에 필요한 파생 항목 채우기 (값을 지어내지 않는 계산만)
+  const x=clone(e);
+  if(kind==='desktop_cpu'){ x.model=key; if(x.disp===undefined) x.disp=key; if(x.t===undefined&&typeof x.p==='number') x.t=(/^U/.test(String(x.gen))?x.p+(x.e||0):x.p*2+(x.e||0)); if(x.k===undefined) x.k=/K$/.test(key); if(x.ht===undefined) x.ht=!/^U/.test(String(x.gen)); }
+  if(kind==='server_cpu'){ x.model=key; if(!x.fam&&!x.series) x.series=key.slice(0,2)+'00P'; }
+  return x; }
+function specCurrent(kind,key){ if(kind==='memory_registry') return MEM_REG.find(x=>x.part===key)||null; const m=specMap(kind); return m?(m[key]||null):null; }
+function specSharedBase(kind,key){ const S=SPECS_BASE_DATA; if(!S) return null; if(kind==='memory_registry') return (S.memory_registry||[]).find(x=>x.part===key)||null; return (S[kind]||{})[key]||null; }
+function specReapply(){ applySpecs(SPECS_BASE_DATA,SPECS_INFO.origin); specUiRefresh(); try{ run(); }catch(e){} }
+function specSaveMsg(ok){ return ok?'이 브라우저에 임시 저장했습니다. 공통 specs.json에는 반영되지 않았습니다.':'브라우저 저장소를 쓸 수 없어 이 화면을 닫으면 사라집니다. (저장 안 됨)'; }
+function diffObj(a,b){ const ks=[...new Set([...Object.keys(a||{}),...Object.keys(b||{})])].filter(k=>!['rec','history','origin'].includes(k)); return ks.filter(k=>JSON.stringify((a||{})[k])!==JSON.stringify((b||{})[k])).map(k=>({k,from:(a||{})[k],to:(b||{})[k]})); }
+function specParseBlock(text){
+  const r={errors:[],warns:[]}; let j;
+  try{ j=JSON.parse(text.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g,'')); }catch(e){ r.errors.push('JSON 형식 오류: '+e.message); return r; }
+  if(!j||typeof j!=='object'){ r.errors.push('JSON 객체가 아님'); return r; }
+  if(!SPEC_KINDS[j.kind]) r.errors.push('kind 는 desktop_cpu / server_cpu / memory_registry 중 하나여야 함');
+  if(!j.key||typeof j.key!=='string') r.errors.push('key(모델명 또는 파트 번호) 누락');
+  if(!j.values||typeof j.values!=='object') r.errors.push('values 누락');
+  if(r.errors.length) return r;
+  const vals=clone(j.values); const key=j.key.trim().toUpperCase().replace(/\s+/g,'');
+  if(j.kind==='memory_registry') vals.part=j.key.trim(); else vals.model=key;
+  const entry=j.kind==='memory_registry'?vals:specFill(j.kind,key,vals);
+  formatCheck(j.kind,entry).forEach(m=>r.errors.push(m));
+  const url=(j.source&&j.source.url)||'';
+  if(!url) r.warns.push('출처 URL 없음 — 승인하려면 출처 URL이 필요합니다');
+  else{ if(!officialUrlOk(url)) r.warns.push('Intel 공식(intel.com) 주소가 아님 — 출처로 쓸 수 있는지 확인'); const slug=url.toLowerCase().replace(/[^a-z0-9]/g,''); const k2=key.toLowerCase().replace(/[^a-z0-9]/g,'').replace(/plus$/,''); if(j.kind!=='memory_registry' && !slug.includes(k2)) r.warns.push(`출처 주소에 모델명(${key})이 보이지 않음 — 같은 모델 페이지인지 직접 확인 (주소 이름이 다른 모델이어도 번호가 같을 수 있음)`); }
+  r.kind=j.kind; r.key=j.kind==='memory_registry'?j.key.trim():key; r.entry=entry; r.url=url; r.checkedAt=j.checkedAt||null; r.note=j.note||''; r.title=(j.source&&j.source.title)||'';
+  r.cur=specCurrent(r.kind,r.key); return r;
+}
+function specBlockReport(r){
+  let h='';
+  if(r.errors.length) h+=`<div class="sp-bad"><b>형식 검사 · 통과 못 함</b><ul>${r.errors.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  else h+=`<div class="sp-ok"><b>형식 검사 통과</b> (구조·자료형·단위·값 사이 일관성만 확인 — 공식 사양 대조 아님)</div>`;
+  if(r.warns&&r.warns.length) h+=`<ul>${r.warns.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  if(r.cur){ const d=diffObj(r.cur,r.entry); h+=`<div><b>이미 있는 항목 — 변경 전후</b>${d.length?`<table><tr><th>항목</th><th>현재</th><th>붙여넣은 값</th></tr>${d.map(x=>`<tr><td>${esc(x.k)}</td><td>${esc(JSON.stringify(x.from))}</td><td>${esc(JSON.stringify(x.to))}</td></tr>`).join('')}</table>`:' 값이 같음'}</div>`; }
+  return h;
+}
+function specAddLocal(kind,key,entry,rec,hist){
+  const L=localLoad(), id=localId(kind,key), prev=L.entries[id], base=specSharedBase(kind,key);
+  const e=clone(entry); e.rec=rec; e.history=((prev&&prev.entry.history)||(base&&base.history)||[]).concat([hist]);
+  L.entries[id]={kind,key,entry:e,base:prev?prev.base:(base?specStripMeta(base):null)};
+  L.log=(L.log||[]).concat([{at:new Date().toISOString(),id,action:hist.action,reason:hist.reason||''}]).slice(-200);
+  return localSave(L);
+}
+function specUiRefresh(){
+  const el=$('spStatus'); if(!el) return;
+  const cnt=(m)=>{ const c={}; Object.values(m).forEach(e=>{ const g=specGate(e); const k=g.status+(g.local?'*':''); c[k]=(c[k]||0)+1; }); return c; };
+  const fmt=c=>Object.entries(c).map(([k,v])=>`${SPEC_STATUS[k.replace('*','')].label}${k.endsWith('*')?'(임시)':''} ${v}`).join(' · ')||'없음';
+  const memC={}; MEM_REG.forEach(e=>{ const g=specGate(e); memC[g.status+(g.local?'*':'')]=(memC[g.status+(g.local?'*':'')]||0)+1; });
+  const L=localLoad(), nL=Object.keys(L.entries).length;
+  const warnVer=SPECS_INFO.fetched&&SPECS_EMBEDDED_VER&&SPECS_INFO.version<SPECS_EMBEDDED_VER?`<div class="sp-bad">배포된 specs.json(${esc(SPECS_INFO.version)})이 이 index.html의 내장본(${esc(SPECS_EMBEDDED_VER)})보다 오래됐습니다. specs.json 을 다시 올렸는지 확인하세요.</div>`:'';
+  const warnFetch=!SPECS_INFO.fetched?`<div class="sp-bad">specs.json 을 불러오지 못해 <b>내장 폴백</b>을 쓰는 중입니다${SPECS_INFO.error?' ('+esc(SPECS_INFO.error)+')':''}. GitHub에 specs.json 이 index.html 과 같은 폴더에 있는지 확인하세요. (파일을 직접 열어 쓰는 경우에는 정상)</div>`:'';
+  el.innerHTML=`<h3>상태</h3><div class="sp-note">앱 <b>${esc(BUILD.ver)}</b> · 빌드 <b>${esc(BUILD.id)}</b> · 사양 데이터 <b>${esc(SPECS_INFO.origin)}</b> ${esc(SPECS_INFO.version)} (${esc(SPECS_INFO.updated||'')})</div>${warnFetch}${warnVer}
+   <table><tr><th>종류</th><th>수</th><th>상태별</th></tr>
+   <tr><td>데스크톱 CPU</td><td>${Object.keys(DB).length}</td><td>${fmt(cnt(DB))}</td></tr>
+   <tr><td>서버 CPU</td><td>${Object.keys(SERVER_DB).length}</td><td>${fmt(cnt(SERVER_DB))}</td></tr>
+   <tr><td>메모리 등록본</td><td>${MEM_REG.length}</td><td>${fmt(memC)}</td></tr></table>
+   <div class="sp-note">'(임시)'는 이 브라우저에만 있는 변경입니다. ${nL?`<b>임시 변경 ${nL}건</b> — 공통 specs.json에는 아직 반영되지 않았습니다.`:'임시 변경 없음.'} ${LOCAL_OK?'':'<span class="sp-bad">브라우저 저장소 사용 불가 — 임시 변경이 저장되지 않습니다.</span>'}</div>
+   ${SPECS_INFO.problems.length?`<details><summary class="sp-bad">공통 사양 파일 형식 검사에서 걸린 항목 ${SPECS_INFO.problems.length}건 (공식 대조와 무관한 구조·범위 검사)</summary><ul>${SPECS_INFO.problems.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:'<div class="sp-note">공통 사양 파일 형식 검사: 걸린 항목 없음 (형식 검사이며 공식 사양 대조가 아님)</div>'}`;
+  const lo=$('spLocal'); if(!lo) return;
+  const ids=Object.keys(L.entries);
+  lo.innerHTML=ids.length?ids.map(id=>{ const le=L.entries[id], e=le.entry, rec=e.rec||{}, st=SPEC_STATUS[rec.status]||SPEC_STATUS.external_candidate; const hist=(e.history||[]).slice(-3).map(h=>`${esc((h.at||'').slice(0,10))} ${esc(h.action)}${h.reason?' — '+esc(h.reason):''}`).join('<br>');
+    const dif=le.base?diffObj(le.base,specStripMeta(e)):null;
+    return `<div class="sp-item" data-id="${esc(id)}"><b>${esc(SPEC_KINDS[le.kind])} · ${esc(le.key)}</b> — ${esc(st.label)}${rec.status==='verified'?' (담당자 승인)':' · 승인 전'}
+      <div class="sp-note">출처: ${rec.sourceUrl?`<a href="${esc(rec.sourceUrl)}" target="_blank" rel="noopener">${esc(rec.sourceUrl)}</a>`:'없음'} · ${esc(rec.checkedAt||'확인일 없음')}</div>
+      ${dif&&dif.length?`<table><tr><th>항목</th><th>공통 값</th><th>임시 값</th></tr>${dif.map(x=>`<tr><td>${esc(x.k)}</td><td>${esc(JSON.stringify(x.from))}</td><td>${esc(JSON.stringify(x.to))}</td></tr>`).join('')}</table>`:(le.base?'':'<div class="sp-note">공통 파일에 없는 새 항목</div>')}
+      <div class="sp-note">${hist}</div>
+      ${rec.status!=='verified'?`<div class="row"><input type="text" class="spUrl" placeholder="출처 URL (intel.com)" value="${esc(rec.sourceUrl||'')}" style="flex:1;min-width:220px"><label><input type="checkbox" class="spChk"> 출처 페이지의 정확한 모델명과 값을 직접 대조했습니다</label><button type="button" class="btn spApprove">승인</button></div>`:''}
+      <div class="row"><button type="button" class="btn btn-ghost spDel">이 임시 변경 되돌리기</button></div></div>`; }).join(''):'<div class="sp-note">임시 변경 없음</div>';
+}
+function specOpenPanel(){ const d=$('spDet'); if(d) d.open=true; const el=$('specMgr'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+function specReport(kind,key){ $('spRepKind').value=kind; $('spRepKey').value=key; specRepLoad(); specOpenPanel(); }
+function specRepLoad(){ const kind=$('spRepKind').value, key=$('spRepKey').value.trim().toUpperCase()===''?'':($('spRepKind').value==='memory_registry'?$('spRepKey').value.trim():$('spRepKey').value.trim().toUpperCase());
+  const cur=specCurrent(kind,key), out=$('spRepOut'); if(!cur){ out.innerHTML='<span class="sp-bad">해당 항목이 없습니다. 새 모델은 ①에 붙여넣으세요.</span>'; $('spRepVals').value=''; return null; }
+  $('spRepVals').value=JSON.stringify(specStripMeta(cur),null,1); const g=specGate(cur); out.innerHTML=`현재 상태: <b>${esc(g.label)}</b>${g.local?' (이 브라우저 임시)':''} · ${g.url?`<a href="${esc(g.url)}" target="_blank" rel="noopener">출처</a>`:'출처 URL 없음'}`; return cur; }
+function specRepRecord(mode){
+  const kind=$('spRepKind').value, raw=$('spRepKey').value.trim(), key=kind==='memory_registry'?raw:raw.toUpperCase(), why=$('spRepWhy').value.trim(), url=$('spRepUrl').value.trim(), out=$('spRepOut');
+  const cur=specCurrent(kind,key); if(!cur){ out.innerHTML='<span class="sp-bad">해당 항목이 없습니다.</span>'; return; }
+  if(!why){ out.innerHTML='<span class="sp-bad">이유를 적어 주세요 (필수).</span>'; return; }
+  const before=specStripMeta(cur);
+  if(mode==='conflict'){
+    const ok=specAddLocal(kind,key,before,{status:'conflict',source:null,sourceUrl:url||specSrcUrl(cur)||null,checkedAt:kstToday(),method:'담당자 충돌 신고',note:why},{at:new Date().toISOString(),action:'충돌 표시',reason:why,before:null,after:null});
+    out.innerHTML=specSaveMsg(ok);
+  }else{
+    let nv; try{ nv=JSON.parse($('spRepVals').value); }catch(e){ out.innerHTML='<span class="sp-bad">값 JSON 형식 오류: '+esc(e.message)+'</span>'; return; }
+    nv=kind==='memory_registry'?{...nv,part:key}:specFill(kind,key,nv);
+    const f=formatCheck(kind,nv); if(f.length){ out.innerHTML='<span class="sp-bad"><b>형식 검사 통과 못 함</b><br>'+f.map(esc).join('<br>')+'</span>'; return; }
+    const d=diffObj(before,nv); if(!d.length){ out.innerHTML='<span class="sp-bad">바뀐 값이 없습니다.</span>'; return; }
+    const ok=specAddLocal(kind,key,nv,{status:'external_candidate',source:null,sourceUrl:url||null,checkedAt:kstToday(),method:'담당자 수정값 제안 — 검토 대기',note:why},{at:new Date().toISOString(),action:'수정값 제안',reason:why,before:Object.fromEntries(d.map(x=>[x.k,x.from])),after:Object.fromEntries(d.map(x=>[x.k,x.to]))});
+    out.innerHTML=specSaveMsg(ok)+' 변경: '+d.map(x=>esc(x.k)).join(', ');
+  }
+  specReapply();
+}
+function specApprove(id,url,confirmed){
+  const L=localLoad(), le=L.entries[id]; if(!le) return '항목 없음';
+  if(!confirmed) return '출처 페이지 대조 확인 칸을 체크해야 승인할 수 있습니다.';
+  if(!url||!/^https:\/\//.test(url)) return '출처 URL(https)을 입력하세요.';
+  if(!officialUrlOk(url)) return 'Intel 공식(intel.com) 주소만 승인할 수 있습니다.';
+  const f=formatCheck(le.kind,le.entry); if(f.length) return '형식 검사 통과 못 함: '+f.join(' / ');
+  const e=le.entry; e.rec={...(e.rec||{}),status:'verified',sourceUrl:url,source:null,checkedAt:kstToday(),method:'담당자가 출처 페이지의 모델명·값을 직접 대조하고 승인 (CNO가 자동 대조한 것이 아님)',approvedAt:new Date().toISOString()};
+  e.history=(e.history||[]).concat([{at:new Date().toISOString(),action:'승인',reason:'출처 대조 후 승인',url}]);
+  return localSave(L)?'':'저장 실패';
+}
+function specPromptText(kind,model){
+  const tpl=kind==='desktop_cpu'?{p:null,e:null,pb:null,pt:null,eb:null,et:null,max:null,l2:null,l3:null,bp:null,mtp:null,mem:null,gpu:null,gf:null,gen:'세대 키(12·13·14·U2 등 기존 값만)',tier:'i5/i7/i9/U5…'}
+    :{cores:null,threads:null,base:null,allcore:null,max:null,l3:null,tdp:null,socket:'LGA…',proc:null,scal:'2S',upi:'2링크(16GT/s)',mem:null,ch:null,maxmem:'4TB',ecc:true,pcie:'5.0',lanes:null,cn:'한글 코드네임(띄어쓰기)',cnEn:'영문 코드네임',amx:null,acc:null,fam:'스케일러블 3~5세대만 "gold3"',brand:'Intel® Xeon® Gold',tier:'골드',tierEn:'Gold',gen:'3세대',cnKw:['한글 코드네임 키워드'],feat:'Optane/SGX/DL Boost 지원'};
+  const tj=JSON.stringify({kind,key:model||'모델명',values:tpl,source:{url:'열어 본 Intel 공식 사양 페이지 주소',title:'페이지 제목'},checkedAt:kstToday(),note:''},null,1);
+  return `아래 모델의 사양을 Intel 공식 사양 페이지(intel.com … /specifications.html)를 직접 열어서 확인하고, 아래 JSON 형식으로만 답해 주세요.
+규칙:
+1) 먼저 페이지 제목의 모델명이 "${model||'모델명'}"과 정확히 같은지 확인합니다. 다르면 values를 채우지 말고 note에 이유만 적어 주세요 (접미사가 다른 모델·비슷한 모델 값 금지).
+2) 페이지에 없는 항목은 null 로 둡니다. 추정·다른 모델 값·기억에 의한 값 금지.
+3) 숫자 항목은 숫자만 (GHz·MB·W 단위 문자 없이), 단위는 항목 이름 기준 (base/max=GHz, l3=MB, tdp=W).
+4) source.url 에는 실제로 연 페이지 주소를 적습니다.
+5) 설명 없이 JSON 코드블록 하나만 답합니다.
+${tj}`; }
+function specPromptFor(){ const nm=$('name')?$('name').value:''; const P=nm?parseCpuName(nm):null; const model=P&&P.model||''; const kind=(P&&(P.isServerFmt||/XEON|제온/i.test(nm)))?'server_cpu':'desktop_cpu';
+  const t=specPromptText(kind,model); (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('Claude 확인 요청문을 복사했습니다'),()=>{ $('spBlock').value=t; specOpenPanel(); toast('복사가 막혀 입력칸에 넣었습니다'); }); }
+(function initSpecUi(){
+  const on=(id,fn)=>{ const el=$(id); if(el) el.addEventListener('click',fn); };
+  on('spPromptBtn',()=>{ specPromptFor(); });
+  on('spCheckBtn',()=>{ const r=specParseBlock($('spBlock').value); $('spBlockOut').innerHTML=specBlockReport(r); });
+  on('spAddBtn',()=>{ const r=specParseBlock($('spBlock').value); $('spBlockOut').innerHTML=specBlockReport(r); if(r.errors.length) return;
+    const was=!!r.cur;
+    const ok=specAddLocal(r.kind,r.key,r.entry,{status:'external_candidate',source:null,sourceUrl:r.url||null,checkedAt:r.checkedAt||kstToday(),method:'외부 자료(붙여넣은 사양 블록)에서 가져옴 — 검토 대기, 출처 대조 전',note:r.note},{at:new Date().toISOString(),action:was?'붙여넣기 수정':'붙여넣기 추가',reason:r.note||'',before:was?specStripMeta(r.cur):null,after:specStripMeta(r.entry)});
+    $('spBlockOut').innerHTML+=`<div><b>${esc(specSaveMsg(ok))}</b> 상태: 검토 대기 — 아래 ③에서 출처 대조 후 승인하세요.</div>`; specReapply(); });
+  on('spRepLoad',()=>specRepLoad()); on('spRepConflict',()=>specRepRecord('conflict')); on('spRepModify',()=>specRepRecord('modify'));
+  on('spExport',()=>{ const L=localLoad(); const out={schema:'cno-specs-changes/1',exportedAt:new Date().toISOString(),baseVersion:SPECS_INFO.version,build:BUILD.id,entries:Object.values(L.entries).map(le=>({kind:le.kind,key:le.key,base:le.base,entry:le.entry})),log:L.log||[]};
+    if(!out.entries.length){ toast('내보낼 임시 변경이 없습니다'); return; }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(out,null,1)],{type:'application/json'})); a.download='specs-changes-'+kstToday()+'.json'; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); toast('파일로 내보냈습니다 — 공통 specs.json에는 아직 반영되지 않았습니다'); });
+  on('spClear',()=>{ const L=localLoad(); if(!Object.keys(L.entries).length){ toast('지울 임시 변경이 없습니다'); return; } if(!confirm('이 브라우저의 임시 변경을 모두 지웁니다. 공통 specs.json은 바뀌지 않습니다.')) return; localSave({v:1,entries:{},log:(L.log||[]).concat([{at:new Date().toISOString(),action:'전체 삭제'}])}); specReapply(); });
+  const lo=$('spLocal'); if(lo) lo.addEventListener('click',e=>{ const it=e.target.closest('.sp-item'); if(!it) return; const id=it.dataset.id;
+    if(e.target.closest('.spApprove')){ const msg=specApprove(id,it.querySelector('.spUrl').value.trim(),it.querySelector('.spChk').checked); if(msg){ toast(msg); return; } toast('승인했습니다 (이 브라우저 임시 · 공통 specs.json 미반영)'); specReapply(); }
+    if(e.target.closest('.spDel')){ const L=localLoad(); delete L.entries[id]; L.log=(L.log||[]).concat([{at:new Date().toISOString(),id,action:'임시 변경 되돌림'}]); localSave(L); specReapply(); } });
+  specUiRefresh();
+})();
+function specChips(){
+  const b=$('buildChip'), v=$('verChip'), c=$('specChip'), fb=$('footBuild'), fv=$('footVer');
+  if(v) v.textContent=BUILD.ver; if(fv) fv.textContent=BUILD.ver; if(b) b.textContent='빌드 '+BUILD.id; if(fb) fb.textContent='빌드 '+BUILD.id+' · 사양 '+SPECS_INFO.version+(SPECS_INFO.fetched?'':' (내장)');
+  if(c){ const nL=SPECS_INFO.localCount||0; c.textContent='사양 '+(SPECS_INFO.fetched?'specs.json ':'내장 ')+SPECS_INFO.version+(nL?` · 임시 ${nL}`:''); c.title=SPECS_INFO.fetched?'공통 specs.json 사용 중':'specs.json 을 불러오지 못해 내장 폴백 사용 중'; c.style.borderColor=SPECS_INFO.fetched?'':'var(--warn)'; }
+}
+(async function loadSpecsFile(){
+  specChips();
+  try{
+    const r=await fetch('specs.json?b='+encodeURIComponent(BUILD.id),{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status);
+    const S=await r.json(); if(S.schema!=='cno-specs/1') throw new Error('schema '+S.schema);
+    applySpecs(S,'공통 specs.json'); SPECS_INFO.fetched=true; SPECS_INFO.error='';
+  }catch(e){ SPECS_INFO.fetched=false; SPECS_INFO.error=String(e&&e.message||e).slice(0,80); }
+  specChips(); specUiRefresh(); try{ run(); }catch(e){}
+})();
 </script>
 </body>
 </html>
