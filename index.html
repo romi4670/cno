@@ -72,8 +72,8 @@
   .in-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:20px;align-items:stretch}
   @media(max-width:860px){.in-grid{grid-template-columns:1fr}}
   .way{display:flex;flex-direction:column;min-width:0}
-  .way-lab{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:10px}
-  .way-lab .n{display:inline-flex;align-items:center;justify-content:center;height:22px;padding:0 8px;border-radius:999px;background:var(--blue-bg);color:var(--blue-ink);font-size:12px;font-weight:700}
+  .way-lab{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;color:var(--ink);margin-bottom:12px}
+  .way-lab .n{display:inline-flex;align-items:center;justify-content:center;height:30px;padding:0 14px;border-radius:999px;background:var(--blue-bg);color:var(--blue-ink);font-size:16px;font-weight:800;letter-spacing:.2px}
   .way-lab .h{font-weight:400;color:var(--ink-3)}
   .or{display:none}
   .drop{flex:1;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
@@ -352,7 +352,7 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
 
 .ocr-crop{margin-top:8px}
 .ocr-crop .crop-l{font-size:12px;font-weight:700;color:var(--blue-ink);margin-bottom:4px}
-.ocr-crop canvas{display:block;max-width:100%;height:auto;border:1.5px solid var(--blue-line);border-radius:4px;background:#fff}
+.ocr-crop canvas{display:block;max-width:72%;height:auto;border:1.5px solid var(--blue-line);border-radius:4px;background:#fff}
   .spm .sp-sec{border-top:1px solid var(--line);padding:14px 0}.spm .sp-sec:first-child{border-top:none;padding-top:0}
   .spm textarea{width:100%;min-height:150px;font:12.5px/1.5 var(--mono);padding:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:var(--r-s)}
   .spm input[type=text],.spm select{width:100%;padding:8px 10px;border:1px solid var(--line);font:inherit;background:var(--panel);color:var(--ink);border-radius:var(--r-s)}
@@ -400,7 +400,7 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
         </div>
         <div class="way">
           <div class="way-lab"><span class="n">방법 2</span>상품명 입력 <span class="h">입력하면 바로 생성</span></div>
-          <div class="field" id="nameField"><label for="name">상품명</label><input id="name" placeholder="예: 14600K (랩터레이크 리프레시) (벌크)" autocomplete="off" spellcheck="false"></div>
+          <div class="field" id="nameField"><input id="name" aria-label="상품명" placeholder="예: 14600K (랩터레이크 리프레시) (벌크)" autocomplete="off" spellcheck="false"></div>
           <div class="opts">
             <div class="opts-t">보조 옵션</div>
             <div class="field"><label for="catSel">카테고리 <span class="lab-s">(자동 분류가 틀렸을 때 직접 선택)</span></label>
@@ -1610,7 +1610,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261106-2340'};
+const BUILD={ver:'v2.1',id:'20261107-0010'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
@@ -2294,13 +2294,10 @@ async function handleImage(file){
     $('catSel').value=''; $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value=f.spec||'';
     OCR_NOTES=f.notes||[]; OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0; OCR_SPEC=!!f.spec;
     if(oddCount(f.name)>=2){ st.className='ocr-st bad'; st.textContent='⚠ 상품명을 제대로 읽지 못했습니다. 상품명 칸을 원본대로 고쳐 주세요.'; }
-    else{ st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (${OCR_MODEL?OCR_MODEL+' 모델 · ':''}신뢰도 ${Math.round(data.confidence)}%) — 원본 상품명 줄과 오른쪽 결과의 상품명을 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`; }
+    else{ st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (${OCR_MODEL?OCR_MODEL+' 모델 · ':''}신뢰도 ${Math.round(data.confidence)}%) — 원본 캡처의 상품명과 오른쪽 결과를 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`; }
     dz.innerHTML=`<div class="drop-t">다른 캡처를 끌어다 놓거나 <b>Ctrl+V</b></div><img src="${url}" alt="입력 캡처"><input type="file" id="file" accept="image/*" hidden>`;
-    bindFile();
-    setNameVisible(!(cropOk && oddCount(f.name)<2));   // 원본 줄을 보여 줄 수 있고 인식이 멀쩡하면 입력칸을 숨김
-    run();
+    bindFile(); run();
   }catch(e){
-    setNameVisible(true);
     st.className='ocr-st bad'; st.textContent='인식 실패: '+e.message; setRunState('err','캡처 인식 실패');
     dz.innerHTML=`<div class="drop-t">캡처를 다시 끌어다 놓거나 <b>Ctrl+V</b></div><div class="drop-s">또는 상품명을 직접 입력하세요</div><input type="file" id="file" accept="image/*" hidden>`; bindFile();
   }
@@ -2319,12 +2316,9 @@ function showNameCrop(img,data,k,name){
   const sc=Math.min(2.4,Math.max(1,900/sw)), cv=document.createElement('canvas'); cv.width=Math.round(sw*sc); cv.height=Math.round(sh*sc);
   const cx=cv.getContext('2d'); cx.imageSmoothingQuality='high'; cx.drawImage(img,sx,sy,sw,sh,0,0,cv.width,cv.height);
   cv.setAttribute('role','img'); cv.setAttribute('aria-label','원본 캡처의 상품명 줄');
-  const lab=document.createElement('div'); lab.className='crop-l'; lab.append('원본 캡처의 상품명 줄 — 오른쪽 결과의 상품명과 같은지 확인하세요 ');
-  const eb=document.createElement('button'); eb.type='button'; eb.className='linkbtn'; eb.textContent='상품명 직접 수정'; eb.onclick=e=>{ e.stopPropagation(); setNameVisible(true); const n=$('name'); if(n) n.focus(); }; lab.appendChild(eb);
+  const lab=document.createElement('div'); lab.className='crop-l'; lab.textContent='원본 캡처의 상품명 → 오른쪽 결과로 확인하세요';
   box.appendChild(lab); box.appendChild(cv); return true;
 }
-/* 상품명 칸은 하나만 보이게: 캡처 인식이 끝나면 숨기고(원본 상품명 줄 + 우측 결과로 확인), '상품명 직접 수정'을 누르면 다시 보임 */
-function setNameVisible(v){ const f=$('nameField'); if(f) f.style.display=v?'':'none'; }
 function bindFile(){ const fi=$('file'); if(fi) fi.onchange=()=>{ if(fi.files[0]) handleImage(fi.files[0]); }; }
 (function initDrop(){
   const dz=$('drop'); bindFile();
@@ -2339,7 +2333,6 @@ function bindFile(){ const fi=$('file'); if(fi) fi.onchange=()=>{ if(fi.files[0]
       dz.innerHTML='<div class="drop-t">캡처를 끌어다 놓거나 <b>Ctrl+V</b>로 붙여넣기</div><div class="drop-s">상품명이 보이게 캡처하면 모델 번호를 읽어 나머지 필드를 채웁니다</div><input type="file" id="file" accept="image/*" hidden>'; bindFile();
       const st=$('ocrStatus'); if(st){ st.className='ocr-st'; st.textContent=''; }
       const cr=$('ocrCrop'); if(cr) cr.innerHTML='';
-      setNameVisible(true);
       try{ run(); }catch(e){}
       toast('이전 상품을 지웠습니다 · 새 캡처를 붙여넣거나 끌어다 놓으세요');
     }
