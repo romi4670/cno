@@ -1213,11 +1213,11 @@ const SET_HW={
 function parseSetName(name){
   const N=(name||'').replace(/\s+/g,' ').trim();
   const o={model:null,cpu:null,gpu:null,ram:null,ramTotal:null,ssd:null,os:null,opts:[],ramFinal:null,ssdFinal:null,missing:[]};
-  const mm=N.match(/\b([A-Z]{2}\d{2}-\d{4}[A-Z]{0,3}|\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}|\d{2}[A-Z]{1,2}\d{2,3}[A-Z]?-[A-Z0-9]{4,6}|NT\d{3}[A-Z]{2,4}-[A-Z0-9]{3,6})\b/); o.model=mm?mm[1]:null;
+  const mm=N.match(/\b([A-Z]{2}\d{2}-\d{4}[A-Z]{0,3}|\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}|\d{2}[A-Z]{1,2}\d{2,3}[A-Z]{0,2}-[A-Z0-9]{4,6}|NT\d{3}[A-Z]{2,4}-[A-Z0-9]{3,6})\b/); o.model=mm?mm[1]:null;
   const pm=N.match(/\(([^()]*\/[^()]*?)(?:\)|$)/);
   if(pm){ // 완제품: (CPU/GPU/RAM/SSD/OS)
     const parts=pm[1].split('/').map(x=>x.trim()).filter(Boolean);
-    o.cpu=parts.find(x=>/ULTRA|CORE|\bI[3579]\b|RYZEN|라이젠/i.test(x))||null;
+    o.cpu=parts.find(x=>/ULTRA|CORE|\bI[3579]\b|RYZEN|라이젠|^R[3579]-\d/i.test(x))||null;
     o.gpu=parts.find(x=>/RTX|GTX|\bRX\s?\d/i.test(x))||null;
     const mem=parts.filter(x=>/^\d+\s*(GB|TB)$/i.test(x)); o.ram=mem[0]||null; o.ssd=mem[1]||null;
     o.os=parts.find(x=>/^Win|^Non\s*OS$|프리도스|FreeDOS/i.test(x))||null;
@@ -1225,8 +1225,10 @@ function parseSetName(name){
     const rm=N.match(/(\d+)\s*GB\s*구성\s*\(\s*(\d+)\s*\+\s*(\d+)\s*\)/);
     if(rm){ o.ramTotal=+rm[1]; o.ram=(+rm[2]===+rm[3])?`${rm[1]}GB(${rm[2]}GB x2)`:null; }
     const sm=N.match(/SSD\s*(\d+\s*(?:TB|GB))/i); o.ssd=sm?sm[1].replace(/\s/g,'').toUpperCase():null;
-    const om=N.match(/Win\s?\d+(?:\s*(?:Pro|Home|P|H)\b)?(?:\s*DSP\s*설치)?/i); o.os=om?om[0].replace(/^Win\s/i,'Win'):null;
+    const om=N.match(/Win\s?\d+(?:\s*(?:Pro|Home|P|H)\b)?(?:\s*(?:DSP|FPP)\s*설치)?/i); o.os=om?om[0].replace(/^Win\s/i,'Win'):null;
   }
+  { const so=N.match(/(?:NVMe\s*)?SSD\s*(\d+\s*(?:TB|GB|T|G))\b\s*(?:교체|구성)/i)||N.match(/NVMe\s*(\d+\s*(?:TB|GB))\s*(?:교체|구성)/i);   // '+ SSD 512G 교체' · '+ NVMe SSD 1TB 교체'
+    if(so){ const v=so[1].replace(/\s/g,'').toUpperCase(); o.ssdOpt=/[TG]$/.test(v)?v+'B':v; } }
   [...N.matchAll(/\[([^\]]+)\]/g)].forEach(m=>{ const t=m[1];
     const a=t.match(/(\d+)\s*TB\s*SSD\s*추가|SSD\s*(\d+)\s*TB\s*추가/i); if(a) o.opts.push({k:'ssdAdd',v:+(a[1]||a[2]),t});
     const b=t.match(/(\d+)\s*GB\s*(?:RAM|램|메모리)\s*(?:교체|증설|변경)/i); if(b) o.opts.push({k:'ramSet',v:+b[1],t});
@@ -1263,74 +1265,129 @@ function genSetSummary(hw,P){
 /* ---- 노트북 일반화 규칙: 등록본(빅터스 15)의 키워드·중요요약 규칙을 등록본이 없는 모델에도 적용 ----
    값은 입력한 '현재 중요요약'과 상품명에서만 가져온다. 원본에 없는 항목은 만들지 않는다 (Truth Protocol) */
 function parseNbSpec(spec){
-  const S={std:false,os:null,inch:null,res:null,nit:null,hz:null,cpuMaker:null,cpuTier:null,cpuModel:null,npu:null,gpuKind:null,gpuModel:null,vram:null,ram:null,ramType:null,ramSpeed:null,ramSwap:null,ssdCap:null,ssdType:null,weight:null,
-    ramOnboard:false,ultraN:null,slotRam:null,slotSsd:null,battery:null,adapter:null,power:null,thick:null,color:null,purpose:null,antiglare:null,coreTxt:null,keys:[],cam:[],others:[]};
+  const S={std:false,os:null,inch:null,res:null,nit:null,hz:null,cpuMaker:null,cpuTier:null,cpuModel:null,npu:null,gpuKind:null,gpuModel:null,gpuList:[],vram:null,ram:null,ramType:null,ramSpeed:null,ramSwap:null,ssdCap:null,ssdType:null,weight:null,
+    ramOnboard:false,ultraN:null,slotRam:null,slotSsd:null,battery:null,adapter:null,power:null,charge:null,thick:null,color:null,purpose:null,antiglare:null,coreTxt:null,cpuGen:null,cpuBare:null,clockPair:null,
+    net:[],video:[],ports:[],extra:[],keys:[],cam:[],hold:[],others:[]};
   if(!spec) return S;
   S.std=/^노트북\|/.test(spec.trim());
   const toks=spec.split(/\s\/\s|\||\s\.\s/).map(x=>x.trim()).filter(Boolean);   // '/' · '|' · ' . ' 구분 모두 읽음
-  const SECT=/^(노트북|화면정보|CPU|램|그래픽|저장장치|네트워크|파워|주요제원|입력장치|단자|영상입출력|웹캠|SD카드)$/;
+  const SECT=/^(노트북|화면정보|CPU|램|그래픽|저장장치|네트워크|파워|주요제원|입력장치|단자|영상입출력|부가기능|사용환경|SD카드)$/;
+  const NORM_OS=v=>/프리도스|FreeDOS|Non\s*OS|미포함|없음/i.test(v)?'미포함(프리도스)':v;
+  const SWAP=v=>/^불가능?$/.test(v)?'불가능':v;
+  const GB=v=>(v||'').replace(/\s/g,'').toUpperCase();
+  const RES_NAME={'1920x1080':'FHD','1920x1200':'WUXGA','2560x1440':'QHD','2560x1600':'WQXGA','2880x1800':'WQXGA+','3840x2160':'UHD','2560x1664':'2.5K'};
+  const setRes=(w,h,nm)=>{ const k=`${w}x${h}`; const n=nm||RES_NAME[k]; S.res=n?`${k}(${n.toUpperCase()==='WQXGA+'?'WQXGA+':n.toUpperCase()})`:k; };
+  const isGpu=t=>/^(Intel®?\s*)?(UHD\s*Graphics|Iris\s*Xe|Intel\s*Graphics)$/i.test(t)||/^Arc\b/i.test(t)||/^(Radeon|RTX\s?\d|GTX\s?\d|RX\s?\d)/i.test(t)||/^\d+\s*core$/i.test(t);
   toks.forEach(t0=>{
     const t=t0.replace(/^\[[^\]]+\]\s*/,'').trim(); if(!t||SECT.test(t)) return;
+    if(/^기본\s*제품$|^기본모델$/.test(t)) return;
     const m=t.match(/^(.+?)\s*:\s*(.+)$/);
-    if(m){ const k=m[1].replace(/\s/g,''), v=m[2].trim();
-      if(/^(운영체제|운영체제\(OS\)|OS)$/i.test(k)) S.os=v;
-      else if(k==='해상도') S.res=v; else if(k==='밝기') S.nit=v; else if(k==='주사율') S.hz=v;
-      else if(/^NPU$/i.test(k)) S.npu=v; else if(k==='램'||k==='램용량') S.ram=v; else if(k==='램교체') S.ramSwap=v;
-      else if(k==='용량') S.ssdCap=v;
-      else if(k==='저장장치'){ if(/^\d+\s*(GB|TB)$/i.test(v)) S.ssdCap=v; else S.ssdType=v; }
-      else if(/^VRAM$/i.test(k)) S.vram=v; else if(k==='무게') S.weight=v;
+    if(m){ const k=m[1].replace(/\s/g,''), v=m[2].trim(); let q;
+      if(/^(운영체제|운영체제\(OS\)|OS)$/i.test(k)) S.os=NORM_OS(v);
+      else if(k==='해상도'){ const r=v.match(/^(\d+)\s*[x*×]\s*(\d+)\s*(?:\(\s*([^)]+)\s*\))?$/); if(r) setRes(r[1],r[2],r[3]); else S.res=v; }
+      else if(k==='밝기') S.nit=v; else if(k==='주사율') S.hz=v;
+      else if(/^NPU$/i.test(k)) S.npu=v; else if(k==='램용량') S.ram=GB(v); else if(k==='램교체') S.ramSwap=SWAP(v);
+      else if(k==='램'){ if((q=v.match(/^(\d+\s*GB)\s*(?:\(\s*((?:LP)?DDR\d\w*)\s*\))?$/i))){ S.ram=GB(q[1]); if(q[2]) S.ramType=q[2]; } else S.ram=GB(v); }
+      else if(/^RAM$/i.test(k)){ if((q=v.match(/^(\d+\s*GB)\s*(?:\(\s*((?:LP)?DDR\d\w*)\s*\))?$/i))){ S.ram=GB(q[1]); if(q[2]) S.ramType=q[2]; } else S.ram=GB(v); }
+      else if(/^SSD$/i.test(k)){ if((q=v.match(/^(\d+\s*(?:GB|TB))\s*(?:\(\s*(NVMe)\s*\))?$/i))){ S.ssdCap=GB(q[1]); if(q[2]) S.ssdType='M.2(NVMe)'; } else S.ssdCap=GB(v); }
+      else if(k==='용량') S.ssdCap=GB(v);
+      else if(k==='저장장치'){ if(/^\d+\s*(GB|TB)$/i.test(v)) S.ssdCap=GB(v); else S.ssdType=v; }
+      else if(/^VRAM$/i.test(k)) S.vram=v; else if(/^TGP$/i.test(k)) S.gpuList.push('TGP:'+v); else if(k==='무게') S.weight=v;
       else if(k==='램슬롯') S.slotRam=v; else if(k==='저장슬롯') S.slotSsd=v; else if(k==='배터리') S.battery=v; else if(k==='어댑터') S.adapter=v;
-      else if(k==='전원') S.power=v; else if(k==='두께') S.thick=v; else if(k==='색상') S.color=v; else if(k==='용도') S.purpose=v;
+      else if(k==='전원') S.power=v; else if(k==='충전단자') S.charge=v; else if(k==='두께') S.thick=v; else if(k==='색상') S.color=v; else if(k==='용도') S.purpose=v;
+      else if(k==='무선랜'||k==='유선랜') S.net.push(`${k}:${v}`);
+      else if(k==='웹캠') S.cam.push(`웹캠(${v})`);
+      else if(/^(썬더볼트\d?|Thunderbolt\d?|USB-?[CA]|USB)$/i.test(k)) S.ports.push(t0);
       else S.others.push(t0);
       return; }
     { let um;
       if((um=t.match(/^(?:Core\s*)?Ultra\s*(\d)\s+(\d{3}[A-Z]?)$/i))){ S.cpuMaker='인텔'; S.ultraN=um[1]; S.cpuTier=`코어 울트라${um[1]}(시리즈${um[2][0]})`; S.cpuModel=um[2]; return; }   // 코어 울트라 2xx = 시리즈2
-      if((um=t.match(/^((?:LP)?DDR\d\w*)\s+(\d+\s*GB)\s*(\(\s*온보드\s*\))?$/i))){ S.ramType=um[1]; S.ram=um[2].replace(/\s/g,''); if(um[3]){ S.ramOnboard=true; if(!S.ramSwap) S.ramSwap='불가'; } return; }
-      if((um=t.match(/^NVMe\s+(\d+\s*(?:GB|TB))\s*(?:\(\s*총\s*슬롯\s*(\d+)\s*\))?$/i))){ S.ssdType='M.2(NVMe)'; S.ssdCap=um[1].replace(/\s/g,''); if(um[2]) S.slotSsd=um[2]+'개'; return; }
-      if((um=t.match(/^(\d+(?:\.\d+)?)\s*cm\s+([A-Za-z]+)\s*\(\s*(\d+)\s*[*x×]\s*(\d+)\s*\)$/))){ S.inch=`${um[1]}cm(${Math.round(parseFloat(um[1])/2.54*10)/10}인치)`; S.res=`${um[3]}x${um[4]}(${um[2].toUpperCase()})`; return; }
-      if(/^운영체제\s*(미포함|없음)$/.test(t)){ S.os='미포함(프리도스)'; return; } }
-    if(/^OS\s*\S/i.test(t)&&!/^OS$/i.test(t)){ S.os=t.replace(/^OS\s*/i,''); return; }   // 'OS미포함(프리도스)' → 미포함(프리도스)
+      if((um=t.match(/^인텔\s+(코어.*)$/))){ S.cpuMaker='인텔'; S.cpuTier=um[1].replace(/울트라\s+(\d)/,'울트라$1'); return; }
+      if((um=t.match(/^((?:LP)?DDR\d\w*)\s*\(\s*온보드\s*\)$/i))){ S.ramType=um[1]; S.ramOnboard=true; if(!S.ramSwap) S.ramSwap='불가능'; return; }
+      if((um=t.match(/^((?:LP)?DDR\d\w*)\s+(\d+\s*GB)(?:\s*\(?\s*(온보드)\s*\)?)?$/i))){ S.ramType=um[1]; S.ram=GB(um[2]); if(um[3]){ S.ramOnboard=true; if(!S.ramSwap) S.ramSwap='불가능'; } return; }
+      if((um=t.match(/^(\d+\s*GB)\s*RAM$/i))){ S.ram=GB(um[1]); return; }
+      if((um=t.match(/^RAM\s*업그레이드\s*(불가능?|가능)$/))){ S.ramSwap=SWAP(um[1]); return; }
+      if((um=t.match(/^NVMe\s+(\d+\s*(?:GB|TB))(?:\s*교체)?\s*(?:\(\s*(?:총\s*슬롯\s*(\d+)|(?:총\s*)?(\d+)\s*슬롯)\s*\))?$/i))){ S.ssdType='M.2(NVMe)'; S.ssdCap=GB(um[1]); const sl=um[2]||um[3]; if(sl) S.slotSsd=sl+'개'; return; }   // '(총 슬롯 2)' · '( 2 슬롯 )' 모두
+      if((um=t.match(/^(\d+\s*(?:GB|TB))\s*SSD$/i))){ S.ssdCap=GB(um[1]); return; }
+      if((um=t.match(/^(\d+(?:\.\d+)?)\s*cm\s+([A-Za-z]+)\s*\(\s*(\d+)\s*[*x×]\s*(\d+)\s*\)$/))){ S.inch=`${um[1]}cm(${Math.round(parseFloat(um[1])/2.54*10)/10}인치)`; setRes(um[3],um[4],um[2]); return; }
+      if((um=t.match(/^(\d+(?:\.\d+)?)\s*["”]\s*(\d+)\s*[*x×]\s*(\d+)$/))){ S.inch=`${Math.round(parseFloat(um[1])*2.54*10)/10}cm(${um[1]}인치)`; setRes(um[2],um[3]); return; }
+      if((um=t.match(/^(\d+)\s*[x*×]\s*(\d+)\s*(?:\(\s*([^)]+)\s*\))?$/))){ setRes(um[1],um[2],um[3]); return; }
+      if(/^(운영체제\s*(미포함|없음)|OS\s*미포함.*)$/.test(t)){ S.os='미포함(프리도스)'; return; }
+      if((um=t.match(/^Intel®?\s*(UHD\s*Graphics)\s*\(\s*내장그래픽\s*\)$/i))){ S.gpuKind='내장그래픽'; S.gpuList.push('UHD Graphics'); return; }
+      if(/^인텔\s*UHD$/.test(t)){ S.gpuList.push('UHD Graphics'); return; }
+      if(/^M\.2\(?NVMe\)?$/i.test(t)){ S.ssdType='M.2(NVMe)'; return; }
+      if(/^(애로우레이크|루나레이크|메테오레이크|랩터레이크|앨더레이크)/.test(t)||/^웹캠\s*OFF$/i.test(t)){ S.hold.push(t); return; }
+      if(/^802\.11/.test(t)){ S.net.push('무선랜:'+t); return; }
+      if(/^최대\s*\d+\s*시간$/.test(t)){ S.hold.push(t); return; }
+      if(/^2in1$/i.test(t)||/^\d+형$/.test(t)||/^[\d.]+\s*~\s*[\d.]+kg$/i.test(t)||/^광시야각$/.test(t)){ S.hold.push(t); return; }
+      if(/^(\d+)세대$/.test(t)){ S.cpuGen=t.replace('세대',''); return; }
+      if(/^\d{4,5}[A-Z]{0,2}$/.test(t)&&S.cpuTier){ S.cpuBare=t; return; }
+      if(/^[\d.]+GHz\([\d.]+GHz\)$/.test(t)){ S.clockPair=t; return; }
+      if(/^USB-?PD/i.test(t)){ if(!S.power) S.power=t; return; } }
+    if(/^OS\s*\S/i.test(t)&&!/^OS$/i.test(t)){ S.os=NORM_OS(t.replace(/^OS\s*/i,'')); return; }   // 'OS미포함(프리도스)' → 미포함(프리도스)
     if(/^안티\s*글레어|^눈부심\s*방지/.test(t)){ S.antiglare=t; return; }
-    if(/^\S*\(\d+\)코어$|^\d+코어$/.test(t)){ S.coreTxt=t; return; }
+    if(/^\S*\(\d+\)코어$|^\d+코어(\(.*\))?$|^(헥사|옥타|데카|쿼드|듀얼)코어(\(.*\))?$/.test(t)){ S.coreTxt=t; return; }
     if(/키패드|방향키|키보드/.test(t)){ S.keys.push(t); return; }
     if(/^웹캠/.test(t)){ S.cam.push(t); return; }
+    if(/^(무선랜|유선랜|블루투스|LAN$|Wi-?Fi|802\.11)/i.test(t)){ S.net.push(t); return; }
+    if(/^(HDMI|DP\b|DisplayPort|미니\s*DP)/i.test(t)){ S.video.push(t); return; }
+    if(/^(USB|썬더볼트|Thunderbolt|Micro\s*SD|MicroSD|SD카드|3\.5mm|이어폰|RJ45)/i.test(t)){ S.ports.push(t); return; }
+    if(/^(TPM|지문인식|고속충전|코파일럿|Copilot)/i.test(t)){ S.extra.push(t); return; }
+    if(/^(그레이|블랙|화이트|실버|블루|그린|골드|베이지|네이비|티탄\s*실버)$/.test(t)){ S.color=t; return; }
+    if(isGpu(t)){ S.gpuList.push(t.replace(/^Intel®\s*/i,'')); return; }
     if(/^\d+(\.\d+)?cm\(.*인치\)$/.test(t)) S.inch=t;
     else if(/^\d+(\.\d+)?kg$/i.test(t)) S.weight=t;
-    else if(/^Win\s?\d+/i.test(t)) S.os=t;
-    else if(/^\d+x\d+/.test(t)) S.res=t;
+    else if(/^(Win\s?\d+|Windows\s*\d+|윈도우\s*\d+|윈\s*\d+)/i.test(t)) S.os=t;
     else if(/^\d+\s*nit$/i.test(t)) S.nit=t;
     else if(/^\d+\s*Hz$/i.test(t)) S.hz=t;
     else if(/^(인텔|AMD|퀄컴|Intel)$/i.test(t)) S.cpuMaker=t;
     else if(/^[A-Za-z0-9\-]+\s*\(\s*(?:최대\s*)?[\d.]+\s*GHz\s*\)$/.test(t)) S.cpuModel=t;
     else if(/(라이젠|코어|울트라|Ryzen|Core|Ultra|스냅드래곤|Snapdragon)/i.test(t) && !/GHz/i.test(t)) S.cpuTier=t;
     else if(/^(내장그래픽|외장그래픽)$/.test(t)) S.gpuKind=t;
-    else if(/(RTX|GTX|Radeon|Graphics|\bArc\b|\bRX\s?\d)/i.test(t)) S.gpuModel=t;
-    else if(/^DDR\d/i.test(t)) S.ramType=t;
+    else if(/^DDR\d|^LPDDR\d/i.test(t)) S.ramType=t;
     else if(/^\d+\s*MHz$/i.test(t)) S.ramSpeed=t;
-    else if(/^\d+\s*(GB|TB)$/i.test(t)){ if(!S.ssdCap) S.ssdCap=t; else S.others.push(t0); }
+    else if(/^\d+\s*(GB|TB)$/i.test(t)){ const n=parseInt(t); if(!S.ram && /GB/i.test(t) && n<=128) S.ram=GB(t); else if(!S.ssdCap) S.ssdCap=GB(t); else S.others.push(t0); }
     else S.others.push(t0);
   });
   // 코어 울트라: '(S2)' → '(시리즈2)', CPU 모델 뒤 단일 GHz는 최대 클럭 → '(최대 4.8GHz)'
   if(S.cpuTier && /울트라/.test(S.cpuTier)){
     S.cpuTier=S.cpuTier.replace(/\(\s*S(\d)\s*\)/i,'(시리즈$1)');
     const um=S.cpuTier.match(/울트라\s*(\d)/); if(um && !S.ultraN) S.ultraN=um[1];
-    if(S.cpuModel){ const cm=S.cpuModel.match(/^([A-Za-z0-9\-]+)\s*\(\s*([\d.]+)\s*GHz\s*\)$/); if(cm) S.cpuModel=`${cm[1]} (최대 ${cm[2]}GHz)`; if(S.ultraN) S.cpuModelId=S.cpuModel.replace(/\s*\(.*$/,''); }
+    if(S.cpuModel){ const cm=S.cpuModel.match(/^([A-Za-z0-9\-]+)\s*\(\s*([\d.]+)\s*GHz\s*\)$/); if(cm && /시리즈\d/.test(S.cpuTier)) S.cpuModel=`${cm[1]} (최대 ${cm[2]}GHz)`;   // 시리즈2(S2)는 단일 GHz가 최대 클럭, 시리즈1(125H 등)은 등록본 표기 유지
+ if(S.ultraN) S.cpuModelId=S.cpuModel.replace(/\s*\(.*$/,''); }
   }
+  // 코어 i: '코어i5' + '13세대' + '1334U' + '1.3GHz(4.6GHz)' 조각 → '코어i5-13세대' · 'i5-1334U (1.3GHz)'
+  if(S.cpuTier && /^코어\s*i\d$/i.test(S.cpuTier) && S.cpuGen) S.cpuTier=S.cpuTier.replace(/\s/g,'')+'-'+S.cpuGen+'세대';
+  if(!S.cpuModel && S.cpuBare){ const tt=(S.cpuTier||'').match(/i(\d)/i); S.cpuModel=(tt?`i${tt[1]}-`:'')+S.cpuBare+(S.clockPair?` (${S.clockPair.match(/^([\d.]+GHz)/)[1]})`:''); }
+  if(S.cpuTier) S.cpuTier=S.cpuTier.replace(/^코어\s*I(\d)/,'코어i$1');
+  { const cm=(S.cpuTier||'').match(/^코어i(\d)-(\d{4,5})([A-Z0-9]*)$/);   // '코어i5-1335U' → 코어i5-13세대 / i5-1335U (세대는 모델 앞 두 자리)
+    if(cm){ const d=cm[2], g=d.length===5?d.slice(0,2):(parseInt(d.slice(0,2))>=10&&parseInt(d.slice(0,2))<=13?d.slice(0,2):d[0]); if(!S.cpuModel) S.cpuModel=`i${cm[1]}-${d}${cm[3]}`; S.cpuTier=`코어i${cm[1]}-${g}세대`; } }
+  if(!S.cpuMaker && S.cpuTier){ if(/^코어/.test(S.cpuTier)) S.cpuMaker='인텔'; else if(/라이젠/.test(S.cpuTier)) S.cpuMaker='AMD'; }
+  if(S.cpuModel) S.cpuModel=S.cpuModel.replace(/^I(\d)-/,'i$1-');
+  if(!S.gpuModel && S.gpuList.length) S.gpuModel=S.gpuList.find(x=>/RTX|GTX|Radeon|\bRX|Arc|Graphics|Iris/i.test(x))||S.gpuList[0];
   return S;
 }
 function genNbSummaryFromSpec(S,P,opt){
+  const reg=!!(opt&&opt.reg);   // 담당자 등록본(삼성·LG) 형식: 용도는 OS 바로 뒤, 램 종류에 (온보드), 저장장치 섹션 분리
   const os=S.os||P.os, ram=S.ram||(P.ram||null), ssd=S.ssdCap||P.ssd;
   const out=['노트북'], add=x=>{ if(x) out.push(x); };
   add(os&&`운영체제(OS):${os}`);
+  if(reg) add(S.purpose&&`용도:${S.purpose}`);
   if(S.inch||S.res||S.nit||S.hz||S.antiglare) out.push('화면정보'); add(S.inch); add(S.res); add(S.nit); add(S.hz&&`주사율:${S.hz}`); add(S.antiglare);
   if(S.cpuMaker||S.cpuTier||S.cpuModel||S.npu||S.coreTxt) out.push('CPU'); add(S.cpuMaker); add(S.cpuTier); add(S.cpuModel); add(S.coreTxt); add(S.npu&&`NPU:${S.npu}`);
-  if(ram||S.ramType||S.ramSpeed||S.ramSwap||S.slotRam) out.push('램'); add(S.ramType); add(ram&&`램 용량:${ram}${S.ramOnboard?'(온보드)':''}`); add(S.ramSpeed); add(S.slotRam&&`램 슬롯:${S.slotRam}`); add(S.ramSwap&&`램 교체:${S.ramSwap}`);
-  if(S.gpuKind||S.gpuModel||S.vram) out.push('그래픽'); add(S.gpuKind); add(S.gpuModel); add(S.vram&&`VRAM:${S.vram}`);
-  if(ssd||S.ssdType||S.slotSsd){ if(opt&&opt.ssdSection){ out.push('저장장치'); add(S.ssdType); }else out.push('저장장치'+(S.ssdType?':'+S.ssdType:'')); add(ssd); add(S.slotSsd&&`저장 슬롯:${S.slotSsd}`); }
+  const onType=reg&&S.ramOnboard&&S.ramType;
+  if(ram||S.ramType||S.ramSpeed||S.ramSwap||S.slotRam) out.push('램'); add(S.ramType&&S.ramType+(onType?'(온보드)':'')); add(ram&&`램 용량:${ram}${(S.ramOnboard&&!onType)?'(온보드)':''}`); add(S.ramSpeed); add(S.slotRam&&`램 슬롯:${S.slotRam}`); add(S.ramSwap&&`램 교체:${S.ramSwap}`);
+  if(S.gpuKind||S.gpuList.length||S.vram) out.push('그래픽'); add(S.gpuKind); S.gpuList.forEach(add); add(S.vram&&`VRAM:${S.vram}`);
+  if(ssd||S.ssdType||S.slotSsd){ if(reg){ out.push('저장장치'); add(S.ssdType); }else out.push('저장장치'+(S.ssdType?':'+S.ssdType:'')); add(ssd); add(S.slotSsd&&`저장 슬롯:${S.slotSsd}`); }
+  if(S.net.length){ out.push('네트워크'); S.net.forEach(add); }
+  const hasBareCam=S.cam.includes('웹캠'), camItems=S.cam.filter(x=>x!=='웹캠'), camSec=!!(opt&&opt.camSection)||hasBareCam;
+  if(S.video.length){ out.push('영상입출력'); S.video.forEach(add); if(!camSec) camItems.forEach(add); }
+  if(S.cam.length && (camSec||!S.video.length)){ out.push('웹캠'); camItems.forEach(add); }
+  if(S.ports.length){ out.push('단자'); S.ports.forEach(add); }
+  if(S.extra.length){ out.push('부가기능'); S.extra.forEach(add); }
   if(S.keys.length){ out.push('입력장치'); S.keys.forEach(add); }
-  if(S.cam.length){ out.push('웹캠'); S.cam.filter(x=>x!=='웹캠').forEach(add); }
-  if(S.battery||S.adapter||S.power){ out.push('파워'); add(S.battery&&`배터리:${S.battery}`); add(S.adapter&&`어댑터:${S.adapter}`); add(S.power&&`전원:${S.power}`); }
-  if(S.thick||S.weight||S.color||S.purpose){ out.push('주요제원'); add(S.thick&&`두께:${S.thick}`); add(S.weight&&`무게:${S.weight}`); add(S.color&&`색상:${S.color}`); add(S.purpose&&`용도:${S.purpose}`); }
+  if(S.battery||S.adapter||S.power||S.charge){ out.push('파워'); add(S.battery&&`배터리:${S.battery}`); add(S.adapter&&`어댑터:${S.adapter}`); add(S.power&&`전원:${S.power}`); add(S.charge&&`충전단자:${S.charge}`); }
+  if(S.thick||S.weight||S.color||(!reg&&S.purpose)){ out.push('주요제원'); add(S.thick&&`두께:${S.thick}`); add(S.weight&&`무게:${S.weight}`); add(S.color&&`색상:${S.color}`); if(!reg) add(S.purpose&&`용도:${S.purpose}`); }
   S.others.forEach(add);
   return out.join('|');
 }
@@ -1356,11 +1413,11 @@ function genNbKeywordsGeneric(S,P,model,nameRaw){
    - 중요요약: 노트북|운영체제(OS)|화면정보|CPU|램|그래픽|저장장치|입력장치|웹캠|파워|주요제원(무게·색상·용도). 원본에 없는 항목은 만들지 않음
    - 상품명: 판매처 표현(예: 듀얼업)은 공식 명칭이 아닐 수 있어 그대로 두고 확인 요청 */
 const NB_MAKERS={
-  lg:{name:'LG',tag:['LG','엘지'],extraKw:line=>[line&&'LG'+line,'엘지노트북']},
+  lg:{name:'LG',tag:['LG','엘지'],extraKw:line=>[line&&'LG'+line.replace(/\s/g,''),'엘지노트북']},
   samsung:{name:'삼성',tag:['삼성','SAMSUNG'],extraKw:()=>['삼성노트북']},
   hp:{name:'HP',tag:['HP','휴렛'],extraKw:line=>[line&&line.replace(/\s/g,''),'HP노트북'],noBase:true,noLine:true,variant:m=>m.replace(/^(\d+-)([A-Za-z]{2})/,(a,b,c)=>b+c.toLowerCase())}
 };
-const NB_MODEL_RE={lg:/^\d{2}[A-Z]{1,2}\d{2,3}[A-Z]?-[A-Z0-9]{4,6}$/, samsung:/^NT\d{3}[A-Z]{2,4}-[A-Z0-9]{3,6}$/};
+const NB_MODEL_RE={lg:/^\d{2}[A-Z]{1,2}\d{2,3}[A-Z]{0,2}-[A-Z0-9]{4,6}$/, samsung:/^NT\d{3}[A-Z]{2,4}-[A-Z0-9]{3,6}$/};
 function nbMakerOf(I,model){
   const t=(I.maker||'')+' '+I.name+' '+(I.brand||'');
   if(NB_MODEL_RE.samsung.test(model)||/삼성|SAMSUNG/i.test(t)) return 'samsung';
@@ -1372,7 +1429,7 @@ function nbMakerOf(I,model){
 function genMakerNbKeywords(S,P,model,line,mk,color){
   const dedupe=a=>a.filter(Boolean).filter((x,i,b)=>b.indexOf(x)===i);   // 대소문자만 다른 모델 표기(15-FD2136TU / 15-fd2136TU)도 모두 유지
   const kw=[model];
-  if(color && /[A-Z]$/.test(model)) kw.push(model.slice(0,-1));   // 모델명 끝 글자가 색상 코드일 수 있어 두 표기 모두 사용
+  if(color && mk==='samsung' && /A[A-Z]$/.test(model)) kw.push(model.slice(0,-1));   // 삼성 모델명 끝 글자(AG·AS·AR)가 색상 코드일 수 있어 두 표기 모두 사용
   const MK=NB_MAKERS[mk];
   if(MK.variant) kw.push(MK.variant(model));
   if(!MK.noBase) kw.push(model.replace(/-.*$/,''));
@@ -1391,33 +1448,50 @@ function genMakerNbKeywords(S,P,model,line,mk,color){
 }
 function processNbMaker(I,P,checks,gen,S,model,mk){
   const MK=NB_MAKERS[mk];
-  const rest=I.name.replace(/^\s*\[[^\]]+\]\s*/,'').trim(), li=rest.indexOf(model), pre=(li>0?rest.slice(0,li):'').trim().split(/\s+/).filter(Boolean);
-  const after=li>=0?rest.slice(li+model.length).trim().split(/\s+/)[0]:'';
-  const color=(after&&/^[가-힣]{2,}$/.test(after))?after:null;
-  const line=mk==='hp'?(pre.length?('HP '+pre.join(' ')).replace(/^HP HP\b/,'HP'):'HP '+((model.match(/^\d+/)||[''])[0])):(pre[0]||null);   // HP: 시리즈명이 없으면 'HP 15'처럼 화면 크기 계열
-  if(/^win/i.test(P.os||'') && !/^Win/.test(P.os)) { checks.push({sev:'ask',t:'상품명 오타',d:`${C(P.os.match(/^\S+/)[0])} → ${C(P.os.match(/^\S+/)[0].replace(/^win/i,'Win'))}. 나머지 상품명은 노트북 상품명 규칙이 아직 없어 그대로 두었습니다`}); }
-  if(P.os && /^win/i.test(P.os)){ P.os=P.os.replace(/^win/i,'Win'); S.os=P.os; }   // 상품명 OS 구성(예: Win11 Pro DSP 설치)을 중요요약 OS로 사용
+  const rest=I.name.replace(/\[[^\]]*\]/g,' ').replace(/\s+/g,' ').trim(), li=rest.indexOf(model);   // [MD PICK]·[기본 제품] 같은 태그 제외
+  let pre=(li>0?rest.slice(0,li):'').trim().split(/\s+/).filter(Boolean).filter(t=>!/^(19|20)\d{2}$/.test(t)&&!/^LG$/i.test(t)&&!/^HP$/i.test(t));   // 연도·제조사명 접두어 제외
+  const afterToks=li>=0?rest.slice(li+model.length).trim().split(/\s+/).filter(Boolean):[];
+  const colorToks=[]; for(const x of afterToks){ if(/^(그레이|블랙|화이트|실버|블루|그린|골드|베이지|네이비|핑크|퍼플|레드|문스톤|티탄|미스틱|다크|라이트|옵시디언|오닉스|에메랄드|아이스)$/.test(x)) colorToks.push(x); else break; }
+  const color=colorToks.length?colorToks[colorToks.length-1]:null;   // '문스톤 그레이' → 색상:그레이
+  // 브랜드 = 제품 라인명 (예: 그램17 · 그램 프로16 · 갤럭시북5 · 울트라PC). 그램은 크기를 붙인 '그램17' 형식
+  let line=null, used=0;
+  if(pre.length){ line=pre[0]; used=1; if(pre[1] && /^프로\d*$/.test(pre[1])){ line+=' '+pre[1]; used=2; } }
+  if(mk==='lg' && line==='그램'){ const sz=(model.match(/^\d+/)||[''])[0]; if(sz) line='그램'+sz; }
+  if(mk==='hp'){ line=pre.length?(/^(HyperX|하이퍼엑스)$/i.test(pre[0])?pre.join(' '):'HP '+pre.join(' ')):'HP '+((model.match(/^\d+/)||[''])[0]); used=pre.length; }   // HP: 시리즈명이 없으면 'HP 15'
+  const extraPre=pre.slice(used);
+  // 상품명 OS 구성 (예: WIN11 Home FPP 설치 → Win11 Home FPP 설치, WIn11 오타 교정)
+  if(P.os && /^win/i.test(P.os)){
+    const fixed=P.os.replace(/^win/i,'Win').replace(/\bPRO\b/,'Pro').replace(/\bHOME\b/,'Home');
+    if(fixed!==P.os) checks.push({sev:'ask',t:'상품명 표기 확인 · OS',d:`${C(P.os)} → ${C(fixed)}. 나머지 상품명은 노트북 상품명 규칙이 아직 없어 그대로 두었습니다`});
+    P.os=fixed; S.os=fixed;
+  }
   // 이름 뒤 괄호(CPU/RAM/SSD/OS)에서 읽은 값을 입력 사양에 보충
-  if(P.cpu && !S.ultraN && !S.cpuModel){ const m=P.cpu.match(/Ultra\s*(\d)[\s-]*(\d{3}[A-Z]?)/i); if(m){ S.cpuMaker='인텔'; S.ultraN=m[1]; S.cpuTier=`코어 울트라${m[1]}(시리즈${m[2][0]})`; S.cpuModel=m[2]; } }
+  if(P.cpu && !S.cpuModel){ const m=P.cpu.match(/(?:Ultra|울트라)\s*(\d)[\s-]*(\d{3}[A-Z]?)/i); if(m){ S.cpuMaker='인텔'; S.ultraN=m[1]; S.cpuTier=(m[2][0]==='2'||/시리즈\d/.test(S.cpuTier||''))?`코어 울트라${m[1]}(시리즈${m[2][0]})`:(S.cpuTier||`코어 울트라${m[1]}`); S.cpuModel=m[2]; } }   // 2xx = 시리즈2
+  if(P.cpu){ const rn=P.cpu.match(/^R([3579])-/i), sp=(S.cpuTier||'').match(/라이젠\s*([3579])/); if(rn && sp && rn[1]!==sp[1]) checks.push({sev:'err',t:'라이젠 티어 불일치 · 상품명 ↔ 입력 사양',d:`상품명 ${C(P.cpu)}는 ${C('라이젠'+rn[1])}인데 입력 사양은 ${C('라이젠'+sp[1])}입니다 — 사양 원본 확인`}); }
   if(P.ram){ const nr=P.ram.replace(/\s/g,'').toUpperCase(); if(S.ram && S.ram.replace(/\s/g,'').toUpperCase()!==nr) checks.push({sev:'err',t:'램 용량 불일치 · 상품명 ↔ 입력 사양',d:`상품명 ${C(nr)} ↔ 입력 ${C(S.ram+(S.ramOnboard?'(온보드)':''))} — 상품명 값으로 바꿨습니다. 제조사 공식 사양으로 최종 확인하세요`}); S.ram=nr; }
-  if(P.ssd && !S.ssdCap) S.ssdCap=P.ssd.replace(/\s/g,'').toUpperCase();
+  if(P.ssdOpt){ if(S.ssdCap && S.ssdCap!==P.ssdOpt) checks.push({sev:'ok',t:'저장장치 · 상품명 옵션 반영',d:`${C('SSD '+P.ssdOpt+' 교체')} → 용량 ${C(P.ssdOpt)} (입력 사양 ${C(S.ssdCap)})`}); S.ssdCap=P.ssdOpt; }
+  else if(P.ssd && !S.ssdCap) S.ssdCap=P.ssd.replace(/\s/g,'').toUpperCase();
   if(!S.os && P.os && /Non\s*OS|프리도스|FreeDOS/i.test(P.os)) S.os='미포함(프리도스)';
+  if(!S.os && /\/FD\)|\bFD\)/.test(I.name)) S.os='미포함(프리도스)';   // 상품명 괄호의 FD = 프리도스
   if(!S.color && color) S.color=color;
+  if(line) S.others=S.others.filter(x=>!x.includes(line));   // 입력에 섞인 제품 라인명 토큰은 브랜드로 이미 사용
   gen.brand=line;
-  checks.push({sev:'ask',t:`${MK.name} 노트북 · 브랜드는 제품 라인명 제안`,d:line?`${C(line)} — ${MK.name} 노트북 브랜드 표기 기준이 확정되지 않아 모니터처럼 제품 라인명을 제안합니다. 기존 ${MK.name} 노트북 등록본과 맞춰 주세요`:'상품명에서 제품 라인명을 찾지 못해 브랜드를 만들지 않았습니다'});
-  if(pre.length>1 && mk!=='hp') checks.push({sev:'ask',t:'상품명 확인 · 판매처 표현 가능성',d:`${C(pre.slice(1).join(' '))} — ${MK.name} 공식 명칭인지 확인이 필요합니다. 노트북 상품명 규칙이 아직 없어 상품명은 그대로 두었습니다`});
+  checks.push({sev:'ask',t:`${MK.name} 노트북 · 브랜드는 제품 라인명 제안`,d:line?`${C(line)} — ${MK.name} 노트북 브랜드 표기 기준이 확정되지 않아 제품 라인명(그램은 ${C('그램17')}처럼 크기 포함)을 제안합니다. 기존 ${MK.name} 노트북 등록본과 맞춰 주세요`:'상품명에서 제품 라인명을 찾지 못해 브랜드를 만들지 않았습니다'});
+  if(extraPre.length && mk!=='hp') checks.push({sev:'ask',t:'상품명 확인 · 판매처 표현 가능성',d:`${C(extraPre.join(' '))} — ${MK.name} 공식 명칭인지 확인이 필요합니다. 노트북 상품명 규칙이 아직 없어 상품명은 그대로 두었습니다`});
   gen.kw=genMakerNbKeywords(S,P,model,line,mk,color).join(',');
-  if(color && /[A-Z]$/.test(model)) checks.push({sev:'ask',t:'모델명 끝 글자 확인',d:`${C(model)} / ${C(model.slice(0,-1))} — 끝 ${C(model.slice(-1))}는 색상 코드로 보이지만 확인할 수 없어 두 표기 모두 키워드에 넣었습니다`});
-  if(S.purpose) checks.push({sev:'warn',t:'키워드 제외 · 포괄어',d:`${C(S.purpose)} 같은 용도어는 키워드에 넣지 않고 중요요약 ${C('용도')} 항목에 둡니다`});
-  const sum=genNbSummaryFromSpec(S,P,{ssdSection:true});
+  if(color && mk==='samsung' && /A[A-Z]$/.test(model)) checks.push({sev:'ask',t:'모델명 끝 글자 확인',d:`${C(model)} / ${C(model.slice(0,-1))} — 끝 ${C(model.slice(-1))}는 색상 코드로 보이지만 확인할 수 없어 두 표기 모두 키워드에 넣었습니다`});
+  if(S.purpose) checks.push({sev:'warn',t:'키워드 제외 · 포괄어',d:`${C(S.purpose)} 같은 용도어는 키워드에 넣지 않고 중요요약 ${C('용도')} 항목(운영체제 바로 뒤)에 둡니다`});
+  const sum=genNbSummaryFromSpec(S,P,{reg:true,camSection:mk!=='lg'});
   if(sum!=='노트북') gen.sum=sum;
   else checks.push({sev:'unk',t:'중요요약 입력 없음',d:'상품 화면의 사양 줄을 "기존 정보와 비교"의 중요요약에 붙여 넣으면 표준 형식으로 조립합니다. 값을 새로 만들지는 않습니다'});
   if(gen.sum){
-    const miss=[]; if(!S.ramType) miss.push('램 종류'); if(!S.ssdType) miss.push('저장장치 종류'); if(!S.gpuModel) miss.push('그래픽'); if(!S.battery&&!S.power) miss.push('파워'); if(!S.weight) miss.push('무게'); if(!S.color) miss.push('색상');
-    if(mk==='lg'&&!S.coreTxt) miss.push('코어 수'); if(!S.cpuModel) miss.push('CPU'); if(S.ultraN) miss.push('CPU 최대 클럭·NPU');
-    checks.push({sev:'ask',t:'중요요약 일부 항목 보류 · 입력에 없음',d:`${miss.map(C).join(' ')} — 입력한 사양에 없어 만들지 않았습니다. 포트·무선·어댑터 용량도 같습니다. ${MK.name} 공식 사양 내용을 중요요약 칸에 함께 붙여 넣으면 같은 순서로 반영됩니다`});
-    if(S.ramOnboard) checks.push({sev:'ok',t:'램 교체 · 온보드 규칙',d:`${C('온보드')}는 램 교체를 ${C('불가')}로 적었습니다`});
-    checks.push({sev:'ok',t:'중요요약 표준 순서로 조립',d:'노트북 → 운영체제(OS) → 화면정보 → CPU → 램 → 그래픽 → 저장장치 → 입력장치 → 웹캠 → 파워 → 주요제원(무게·색상·용도) 순서. 값은 입력 원본 그대로입니다'});
+    const miss=[]; if(!S.ramType) miss.push('램 종류'); if(!S.ssdType) miss.push('저장장치 종류'); if(!S.gpuList.length) miss.push('그래픽'); if(!S.battery&&!S.power) miss.push('파워'); if(!S.weight) miss.push('무게'); if(!S.color) miss.push('색상');
+    if(!S.coreTxt) miss.push('코어 수'); if(!S.cpuModel) miss.push('CPU'); if(S.ultraN&&!S.npu) miss.push('CPU 최대 클럭·NPU'); if(!S.net.length) miss.push('네트워크'); if(!S.ports.length) miss.push('단자');
+    checks.push({sev:'ask',t:'중요요약 일부 항목 보류 · 입력에 없음',d:`${miss.map(C).join(' ')} — 입력한 사양에 없어 만들지 않았습니다. ${MK.name} 공식 사양 내용을 중요요약 칸에 함께 붙여 넣으면 같은 순서로 반영됩니다`});
+    if(S.hold.length) checks.push({sev:'ask',t:'등록본에 자리가 없는 항목 · 중요요약에서 제외',d:`${S.hold.map(C).join(' ')} — 등록본 형식에 해당 항목이 없어 넣지 않았습니다. 필요하면 위치를 알려 주세요`});
+    if(S.ramOnboard) checks.push({sev:'ok',t:'램 교체 · 온보드 규칙',d:`${C('온보드')}는 램 종류에 ${C('(온보드)')}로 쓰고 램 교체는 ${C('불가능')}으로 적었습니다`});
+    if(S.os && !/^미포함/.test(S.os) && !P.os) checks.push({sev:'ask',t:'OS 표기 확인',d:`${C(S.os)} — 원본 표기 그대로입니다. 상품명 구성(예: Win11P)과 표기 통일 기준이 아직 없어 확인이 필요합니다`});
+    checks.push({sev:'ok',t:'중요요약 등록본 순서로 조립',d:'노트북 → 운영체제(OS) → 용도 → 화면정보 → CPU → 램 → 그래픽 → 저장장치 → 네트워크 → 영상입출력 → 웹캠 → 단자 → 부가기능 → 입력장치 → 파워 → 주요제원 순서 (삼성·LG 등록본 기준). 값은 입력 원본 그대로입니다'});
     if(S.others.length) checks.push({sev:'warn',t:`표준 위치를 모르는 항목 · ${S.others.length}건`,d:S.others.map(C).join(' ')+' — 끝에 그대로 붙였습니다. 위치를 확인하세요'});
   }
   return {checks,gen,P,hw:null,key:model};
@@ -1761,9 +1835,10 @@ const NAME_NOTE='<div class="nm-note"><b>상품명 작성 주의</b> 상품명�
 function detectCategory(I){
   // 상품명·브랜드·제조사만으로 판별 (중요요약 값의 UHD 730 같은 CPU 내장그래픽 표기에 속지 않도록 spec 제외)
   // 완제품 PC: 상품명 괄호에 'CPU/GPU/RAM/SSD/OS' 구성, 노트북: 시리즈명·모델 코드
+  if(/(?:^|[\s\]])\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}\b/.test(I.name) || /^\s*노트북\s*(\||\/)/.test(I.spec||'')) return 'nb';   // HP 노트북 모델 코드 · 사양이 '노트북|…'으로 시작하면 (RTX가 있어도) 노트북
   if(/\(([^()]*\/){2,}[^()]*(?:\)|$)/.test(I.name) && /RTX|GTX|\bRX\s?\d{3,4}/i.test(I.name) && !/Processor/i.test(I.name)) return 'pc';
   if((/DDR\s?[2345]/i.test(I.name)||/PC[2345]-\d{5}/i.test(I.name)) && /\d+\s*G(?:B)?\b/i.test(I.name) && (/PC[2345]-\d{5}/i.test(I.name)||/메모리/.test(I.name)||/-\s*\d{4,5}\s*$/.test(I.name)) && !/Processor|RTX|GTX|라이젠|코어\s*(?:i\d|울트라)|\bUltra\b|\bCore\b|\bi[3579]-/i.test(I.name)) return 'ram';
-  if(/빅터스|VICTUS|옴니북|파빌리온|노트북/i.test(I.name) || /(?:^|[\s\]])\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}\b/.test(I.name) || /(?:^|[\s\]])\d{2}[A-Z]{1,2}\d{2,3}[A-Z]?-[A-Z0-9]{4,6}\b/.test(I.name) || /(?:^|[\s\]])NT\d{3}[A-Z]{2,4}-[A-Z0-9]{3,6}\b/.test(I.name)) return 'nb';
+  if(/빅터스|VICTUS|옴니북|파빌리온|노트북/i.test(I.name) || /(?:^|[\s\]])\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}\b/.test(I.name) || /(?:^|[\s\]])\d{2}[A-Z]{1,2}\d{2,3}[A-Z]{0,2}-[A-Z0-9]{4,6}\b/.test(I.name) || /(?:^|[\s\]])NT\d{3}[A-Z]{2,4}-[A-Z0-9]{3,6}\b/.test(I.name)) return 'nb';
   if(/DDR\s?[2345]/i.test(I.name) && /\d+\s*GB/i.test(I.name) && !/Processor/i.test(I.name)) return 'ram';
   const t=I.brand+' '+I.name+' '+I.maker;
   const cpuHint=/Processor|XEON|제온|인텔|INTEL|코어|CORE|ULTRA|울트라|라이젠|RYZEN|EPYC|펜티엄|셀러론|랩터레이크|앨더레이크|애로우레이크|\b\d{4,5}[A-Z]{0,3}\s*\(/i.test(t);
