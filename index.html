@@ -1189,7 +1189,7 @@ function parseRamName(name){
   if(sp) o.speed=+sp[1]; if(pc) o.pc=+pc[1];
   if(!o.speed && o.pc) o.speed=Math.round(o.pc/8); if(!o.pc && o.speed) o.pc=o.speed*8;
   const cl=N.match(/\bCL\s?(\d{2})\b/i); o.cl=cl?+cl[1]:null;
-  const cm=N.match(/(\d+)\s*GB/i); o.cap=cm?+cm[1]:null;
+  const cm=N.match(/(?<![A-Za-z\d-])(\d+)\s*G(?:B)?\b/i); o.cap=cm?+cm[1]:null;
   const k=N.match(/\(\s*(\d+)\s*GB\s*[xX*]\s*(\d)\s*\)/)||N.match(/(\d)\s*[xX]\s*(\d+)\s*GB/);
   if(k){ if(/GB\s*[xX*]/.test(k[0])){ o.cap=+k[1]*+k[2]; o.count=+k[2]; } else { o.cap=+k[1]*+k[2]; o.count=+k[1]; } }
   else if(o.cap) o.count=1;
@@ -1209,6 +1209,10 @@ function genRamSummary(R,spec){
     return {sum:['서버용',R.type,sp,R.ecc&&'ECC',R.reg&&'REG',R.brand&&R.cap?`모듈제조사:${R.brand} ${mod} ${R.cap}GB`:null].filter(Boolean).join('|'),miss};
   }
   const timing=carry(/^램타이밍:/), volt=carry(/^\d\.\d+V$/), heat=carry(/^히트싱크:/);
+  if(R.notebook){
+    if(!timing && !R.cl) miss.push('램타이밍'); if(!volt) miss.push('전압');
+    return {sum:['노트북용',R.type,sp,timing||(R.cl?`램타이밍:CL${R.cl}`:null),volt||'[전압 확인 필요]',R.count?`램개수:${R.count}개`:null].filter(Boolean).join('|'),miss,nb:true};
+  }
   if(!timing){ miss.push('램타이밍 상세'); } if(!volt) miss.push('전압'); if(!heat) miss.push('히트싱크');
   const out=[R.notebook?'노트북용':'데스크탑용',R.type,sp,
     timing||(R.cl?`램타이밍:CL${R.cl}-[확인 필요]`:null), volt||'[전압 확인 필요]',
@@ -1217,15 +1221,22 @@ function genRamSummary(R,spec){
 }
 function genRamKeywords(R){
   const u=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
-  return u([R.part,R.brand,R.type,R.type+'-'+R.speed,'PC'+R.type.slice(3)+'-'+R.pc,R.cap?R.cap+'GB':null,R.cl?'CL'+R.cl:null,R.ecc?'ECC':null,R.reg?(R.lrdimm?'LRDIMM':'RDIMM'):null]);
+  return u([R.part,R.brand,(R.maker&&R.maker!==R.brand&&!/^\[/.test(R.maker))?R.maker:null,R.type,R.type+'-'+R.speed,'PC'+R.type.slice(3)+'-'+R.pc,R.cap?R.cap+'GB':null,R.cl?'CL'+R.cl:null,R.ecc?'ECC':null,R.reg?(R.lrdimm?'LRDIMM':'RDIMM'):null]);
 }
 function processRam(I){
-  const checks=[], gen={brand:null,kw:null,sum:null}, R=parseRamName(I.name);
+  const checks=[], gen={brand:null,kw:null,sum:null,name:null,sub:I.sub||''};
+  let nm=(I.name||'').replace(/\s+/g,' ').trim(); let lead=null;
+  { const b0=(nm.match(/^\[[^\]]{1,20}\]\s*/)||[''])[0], rest=nm.slice(b0.length);
+    const lm=rest.match(/^(.+?)\s+(?=노트북|데스크탑|데스크톱|서버용|DDR\s?\d)/);
+    if(lm && lm[1].length<=12 && !/DDR|\d{3,}/i.test(lm[1])){ lead=lm[1]; nm=(b0+rest.slice(lm[0].length)).trim(); } }
+  gen.name=nm;
+  const R=parseRamName(nm); if(lead) R.brand=lead; else if(!R.brand && (I.maker||'').trim()) { R.brand=I.maker.trim(); R.brandFromMaker=true; }
+  R.maker=(I.maker||'').trim();
   if(!R.ok){ checks.push({sev:'unk',t:'메모리 규격을 읽지 못함',d:'상품명에서 DDR 세대와 속도를 찾지 못해 키워드·중요요약을 만들지 않음'}); return {checks,gen,R}; }
-  if(R.brand) gen.brand=R.brand;
+  if(R.brand){ gen.brand=R.brand; if(lead) checks.push({sev:'ask',t:'브랜드 분리',d:`상품명 앞의 ${C(lead)}를 브랜드로 옮기고 상품명에서 뺐습니다. 제조사는 ${C(R.maker||'-')}입니다`}); else if(R.brandFromMaker) checks.push({sev:'ask',t:'브랜드 = 제조사',d:'상품명에 브랜드가 따로 없어 제조사명을 브랜드로 제안했습니다'}); }
   else checks.push({sev:'unk',t:'브랜드 확인불가',d:'상품명 앞의 [브랜드] 표기가 없어 브랜드를 만들지 않음'});
   // 속도 ↔ PC 번호 일관성
-  const pcN=(I.name.match(/PC\d-(\d{5})/i)||I.name.match(/-\s*(\d{5})\s*$/)||[])[1], spN=(I.name.match(/DDR\d-(\d{4})\b/i)||I.name.match(/\b(\d{4})\s*MHz/i)||I.name.match(/-\s*(\d{4})\s*$/)||[])[1];
+  const pcN=(nm.match(/PC\d-(\d{5})/i)||nm.match(/-\s*(\d{5})\s*$/)||[])[1], spN=(nm.match(/DDR\d-(\d{4})\b/i)||nm.match(/\b(\d{4})\s*MHz/i)||nm.match(/-\s*(\d{4})\s*$/)||[])[1];
   if(pcN && spN && +pcN!==+spN*8) checks.push({sev:'err',t:'속도 ↔ PC 번호 불일치',d:`${C(spN+'MHz')} ↔ ${C('PC'+R.type.slice(3)+'-'+pcN)} — 속도×8이 PC 번호(${spN*8})와 달라야 할 이유가 없음`});
   else checks.push({sev:'ok',t:'속도 ↔ PC 번호 일치',d:`${C(R.speed+'MHz')} ↔ ${C('PC'+R.type.slice(3)+'-'+R.pc)}`});
   if(R.server && R.type==='DDR5' && R.desktop) checks.push({sev:'err',t:'서버용·데스크탑 표기 충돌',d:'상품명에 서버용(ECC/REG)과 데스크탑이 함께 있음'});
@@ -1242,7 +1253,8 @@ function processRam(I){
     const oo=old.filter(o=>!kws.some(k=>n(k)===n(o))), gg=kws.filter(k=>!old.some(o=>n(o)===n(k)));
     if(!oo.length&&!gg.length) checks.push({sev:'ok',t:'키워드 현재값 일치',d:'현재 등록값과 제안값의 항목이 같음'});
     else{ if(oo.length) checks.push({sev:'warn',t:`키워드 현재값에만 있는 항목 · ${oo.length}건`,d:oo.map(C).join(' ')}); if(gg.length) checks.push({sev:'warn',t:`키워드 제안에만 있는 항목 · ${gg.length}건`,d:gg.map(C).join(' ')}); } }
-  checks.push({sev:'ask',t:'RAM 키워드는 규칙 확정 전 제안',d:'파트 번호 → 브랜드 → DDR 세대 → DDR세대-속도 → PC 번호 → 용량 → CL → ECC·RDIMM 순서입니다. 브랜드 한글·영문 표기와 제조사명은 상품명에 없어 넣지 않았습니다. 등록 전 확인하세요'});
+  if(g.nb) checks.push({sev:'ask',t:'노트북 메모리는 등록본이 없음',d:'데스크탑 등록 형식에서 노트북에 해당하지 않는 항목(히트싱크·온다이ECC)을 뺐습니다. 노트북 메모리 등록 예시를 주시면 형식을 확정합니다'});
+  checks.push({sev:'ask',t:'RAM 키워드는 규칙 확정 전 제안',d:'파트 번호 → 브랜드 → DDR 세대 → DDR세대-속도 → PC 번호 → 용량 → CL → ECC·RDIMM 순서입니다. 브랜드의 다른 표기(한글·영문)는 상품명에 없어 넣지 않았고, 제조사명은 브랜드와 다를 때만 넣습니다. 등록 전 확인하세요'});
   return {checks,gen,R};
 }
 /* 완제품 PC 일반화: 등록본이 없는 모델도 키워드만 같은 규칙으로 (중요요약은 등록본이 없어 만들지 않음) */
@@ -1335,6 +1347,7 @@ function detectCategory(I){
   // 상품명·브랜드·제조사만으로 판별 (중요요약 값의 UHD 730 같은 CPU 내장그래픽 표기에 속지 않도록 spec 제외)
   // 완제품 PC: 상품명 괄호에 'CPU/GPU/RAM/SSD/OS' 구성, 노트북: 시리즈명·모델 코드
   if(/\(([^()]*\/){2,}[^()]*(?:\)|$)/.test(I.name) && /RTX|GTX|\bRX\s?\d{3,4}/i.test(I.name) && !/Processor/i.test(I.name)) return 'pc';
+  if(/DDR\s?[2345]/i.test(I.name) && /\d+\s*G(?:B)?\b/i.test(I.name) && (/PC[2345]-\d{5}/i.test(I.name)||/메모리/.test(I.name)||/-\s*\d{4,5}\s*$/.test(I.name)) && !/Processor|RTX|GTX|라이젠|코어|Ultra|Core|\bi[3579]-/i.test(I.name)) return 'ram';
   if(/빅터스|VICTUS|옴니북|파빌리온|노트북/i.test(I.name) || /(?:^|[\s\]])\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}\b/.test(I.name)) return 'nb';
   if(/DDR\s?[2345]/i.test(I.name) && /\d+\s*GB/i.test(I.name) && !/Processor/i.test(I.name)) return 'ram';
   const t=I.brand+' '+I.name+' '+I.maker;
@@ -1380,6 +1393,7 @@ function run(){
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
   if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:OCR_FIX.bySpec?`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 모델 번호가 깨져 읽혀서, 상품명 괄호의 사양(코어·스레드·캐시·클럭)이 서버 사양 DB의 이 모델과 정확히 같을 때만 제안했습니다. 원본 캡처와 반드시 대조하세요`:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
   if(OCR_NOTE && OCR_SPEC && I.spec) extra.push({sev:'ask',t:'캡처에서 읽은 중요요약 사용',d:'작은 글씨라 숫자·모델명이 틀리게 읽힐 수 있습니다(예: 225U). 원본과 반드시 대조하거나, 구관리자의 중요요약을 복사해 "기존 정보와 비교"에 붙여 넣으세요.'});
+  if(OCR_NOTE && OCR_NOTES.length) extra.push({sev:'ask',t:'캡처 인식 보정 · 메모리 표기',d:OCR_NOTES.map(n=>`${C(n.from)} → ${C(n.to)}`).join(' ')+' — 규격(PC 번호)과 짝이 맞는 표기로 고쳤습니다. 원본 캡처와 반드시 대조하세요'});
   if(OCR_NOTE && OCR_KWDROP) extra.push({sev:'warn',t:'인식된 키워드 일부 제외',d:`읽을 수 없는 글자가 섞인 항목 ${OCR_KWDROP}개를 비교에서 제외했습니다. 원본 키워드를 "기존 정보와 비교"에 직접 붙여넣으면 정확히 점검됩니다.`});
   if(cat==='monitor'){
     const mpre=I.spec?normalizeMonSummary(I.spec,I.name):null;
@@ -1407,10 +1421,10 @@ function run(){
     const r=processRam(I);
     M.textContent='검증 모드 · RAM (담당자 등록본 형식 · 상품명 보존)';
     if(symChk) r.checks.push(symChk);
-    g+=genRow('name','상품명',I.name,'',r.checks.some(c=>c.sev==='ask'||c.sev==='err')?['ask','확인 요청 있음']:['ok','현행 유지']);
+    g+=genRow('name','상품명',r.gen.name||I.name,'',r.checks.some(c=>c.sev==='ask'||c.sev==='err')?['ask','확인 요청 있음']:['ok','현행 유지']);
     g+=NAME_NOTE;
     g+=genRow('brand','브랜드',r.gen.brand,'상품명에 [브랜드]가 없어 만들지 않음',r.gen.brand?['ask','상품명 기준 · 확인 요청']:['unk','확인불가']);
-    g+=genRow('sub','부가제목','','이 카테고리는 부가제목을 만들지 않음 — 현재값 유지',['unk','현재값 유지']);
+    g+=genRow('sub','부가제목',r.gen.sub,'부가제목이 없어 비워 둠',r.gen.sub?['ok','캡처·현재값 유지']:['unk','현재값 유지']);
     g+=genRow('kw','키워드',r.gen.kw,'규격을 읽지 못해 키워드를 만들지 않음',r.gen.kw?['ask','제안 · 규칙 확정 전']:['unk','생성 안 함']);
     g+=genRow('sum','중요요약설명',r.gen.sum,'규격을 읽지 못해 중요요약을 만들지 않음',r.gen.sum?(/확인 필요\]/.test(r.gen.sum)?['ask','일부 확인 필요']:['ok','상품명 기반 · 등록본 형식']):['unk','생성 안 함']);
     K.innerHTML=renderChecks([...extra,...r.checks]);
@@ -1469,8 +1483,8 @@ function run(){
   else setRunState('done','결과 완료');
 }
 function setRunState(kind,text){ const el=$('runState'); if(!el) return; el.className='state st-'+kind; el.textContent=text; }
-let T_RUN=null, OCR_NOTE=false, OCR_FIX=null, OCR_KWDROP=0, OCR_SPEC=false;
-$('name').addEventListener('input',()=>{ OCR_NOTE=false; OCR_FIX=null; OCR_KWDROP=0; clearTimeout(T_RUN); T_RUN=setTimeout(run,350); });
+let OCR_NOTES=[]; let T_RUN=null, OCR_NOTE=false, OCR_FIX=null, OCR_KWDROP=0, OCR_SPEC=false;
+$('name').addEventListener('input',()=>{ OCR_NOTES=[]; OCR_NOTE=false; OCR_FIX=null; OCR_KWDROP=0; clearTimeout(T_RUN); T_RUN=setTimeout(run,350); });
 ['maker','brand','sub','kw','spec'].forEach(id=>$(id).addEventListener('input',()=>{ if(id==='spec') OCR_SPEC=false; clearTimeout(T_RUN); T_RUN=setTimeout(run,350); }));
 ['as','cooler'].forEach(id=>$(id).addEventListener('change',run));
 
@@ -1539,6 +1553,7 @@ function parseShotText(text){
     const iL=idx(/\[[^\]]{1,12}\]\s*\S/);
     if(iL>=0){ const m=lines[iL].match(/\[([^\]]{1,12})\]\s*(.+)$/); out.maker=m[1]; out.name=m[2]; }
     const iX=lines.findIndex((l,i)=>i>iL && /※/.test(l)); if(iX>=0) out.sub=lines[iX];
+    else { const iY=lines.findIndex((l,i)=>i>iL && /^[^\[\]]{0,6}\[[가-힣 ]{3,14}\]\s*$/.test(l)); if(iY>=0) out.sub=lines[iY].match(/\[[가-힣 ]{3,14}\]/)[0]; }
     // 목록 화면의 중요요약(노트북 등): 제목 다음 줄부터 '업체직발송·택배마감' 앞까지. 작은 글씨라 인식 오류 가능 → 화면에서 확인 요청
     if(iL>=0){ const sp=[]; for(let i=iL+1;i<lines.length;i++){ if(/업체\s*직발송|무료\s*배송|택배\s*마감|해당\s*제품은|^MP\d{8,}/.test(lines[i])) break; if(/※/.test(lines[i])) continue; sp.push(lines[i]); }
       const sj=sp.join(' ').trim(); if(/^노트북(\s|\/|\|)/.test(sj) || (sj.match(/\|/g)||[]).length>=5) out.spec=sj; }
@@ -1546,6 +1561,15 @@ function parseShotText(text){
   if(!out.name && iN<0){ const c=lines.find(l=>/\b\d{4,5}[A-Z]{0,2}\b|Processor/.test(l) && !/제조사|브랜드|부가제목|키워드|이벤트/.test(l)); if(c) out.name=c; }
   // OCR 교정: 문자 혼동이 확정적인 경우만
   out.name=out.name.replace(/×/g,'X');
+  // 메모리 이름: DDR 글자가 숫자로 깨진 경우(예: DDR4 → 0084)와 끝 괄호 보정 — 보정한 사실은 화면에 확인 요청으로 표시
+  out.notes=[];
+  { const pm=out.name.match(/PC([2345])-\d{5}/);
+    if(pm){
+      const t0=out.name.match(/(^|\s)([0OD]{2}[8R]\d)(?=\s)/);
+      if(t0 && t0[2]!=='DDR'+pm[1]){ out.notes.push({from:t0[2],to:'DDR'+pm[1]}); out.name=out.name.replace(t0[2],'DDR'+pm[1]); }
+      const t1=out.name.match(/\(([A-Z]{2,3})\)(?=\s*-\s*\d{4}\s*$)/);
+      if(t1){ out.notes.push({from:'('+t1[1]+')',to:'(정품)'}); out.name=out.name.replace(t1[0],'(정품)'); }
+    } }
   // 서버 'Processor' 형식: 모델 번호 앞뒤 잡글자 제거 + 모델 번호가 깨졌으면 사양(코어·스레드·캐시·클럭)이 서버 DB의 한 모델과 정확히 같을 때만 그 모델로 제안
   out.nameOk=true;
   { const sm=out.name.match(/^(.*?)\bProcessor\s*(\([^)]*?GHz\s*\))/i);
@@ -1620,7 +1644,7 @@ async function handleImage(file){
     const data=best.data, f=best.f;
     if(!f.name){ throw new Error('상품명을 찾지 못했습니다. 상품명이 보이도록 다시 캡처하거나 직접 입력해 주세요.'); }
     $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value=f.spec||'';
-    OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0; OCR_SPEC=!!f.spec;
+    OCR_NOTES=f.notes||[]; OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0; OCR_SPEC=!!f.spec;
     if(oddCount(f.name)>=2){ st.className='ocr-st bad'; st.textContent='⚠ 상품명을 제대로 읽지 못했습니다. 상품명 칸을 원본대로 고쳐 주세요.'; }
     else{ st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (신뢰도 ${Math.round(data.confidence)}%) — 상품명 칸을 원본과 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`; }
     dz.innerHTML=`<div class="drop-t">다른 캡처를 끌어다 놓거나 <b>Ctrl+V</b></div><img src="${url}" alt="입력 캡처"><input type="file" id="file" accept="image/*" hidden>`;
