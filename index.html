@@ -339,6 +339,16 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
 .drop:focus:not(.over)::before{content:'● 붙여넣기 준비됨 · Ctrl+V';position:absolute;top:10px;right:12px;font-size:11.5px;font-weight:700;color:#0A47CC}
 .drop{cursor:pointer}
 @media(max-width:1000px){.work .in-grid{grid-template-rows:auto auto}}
+
+/* ---- 드래그 중: 기존 캡처는 사라지고 '여기에 놓으세요'만 / Enter 재조회 피드백 ---- */
+.drop.over{background:#D6E4FF !important;border-color:#0A47CC !important;border-style:solid !important;box-shadow:0 0 0 5px rgba(12,88,251,.32) !important}
+.drop.over > *{visibility:hidden !important}
+.drop.over::before{content:none !important}
+.drop.ready:not(.over) img{opacity:.35;transition:opacity .15s}
+@keyframes genFlash{0%{box-shadow:0 0 0 0 rgba(12,88,251,.0)}30%{box-shadow:inset 0 0 0 3px rgba(12,88,251,.45)}100%{box-shadow:inset 0 0 0 0 rgba(12,88,251,0)}}
+#gen.flash{animation:genFlash .7s ease-out}
+#toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(12px);background:#1F2937;color:#fff;font-size:13px;font-weight:600;padding:9px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;z-index:50}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -468,7 +478,7 @@ const C = s => `<code>${esc(s)}</code>`;   // 사용자 입력은 항상 이스�
 const CN_CANON = {
   '스카이레이크':'스카이레이크','카비레이크':'카비레이크','케이비레이크':'카비레이크','캐비레이크':'카비레이크',
   '커피레이크':'커피레이크','커피레이크리프레시':'커피레이크 리프레시','커피레이크-r':'커피레이크 리프레시','커피레이크r':'커피레이크 리프레시',
-  '코멧레이크':'코멧레이크','컴멧레이크':'코멧레이크','로켓레이크':'로켓레이크',
+  '코멧레이크':'코멧레이크','컴멧레이크':'코멧레이크','코멧레이크리프레시':'코멧레이크 리프레시','코멧레이크s리프레시':'코멧레이크 리프레시','코멧레이크s':'코멧레이크','로켓레이크':'로켓레이크',
   '앨더레이크':'앨더레이크','알더레이크':'앨더레이크',
   '랩터레이크':'랩터레이크','랩터레이크리프레시':'랩터레이크 리프레시','랩터레이크-r':'랩터레이크 리프레시','랩터레이크r':'랩터레이크 리프레시',
   '애로우레이크':'애로우레이크','애로우레이크리프레시':'애로우레이크 리프레시',
@@ -493,6 +503,9 @@ function canonCN(s){ const k=cnKey(s); return CN_CANON[k] || CN_CANON[k.replace(
    - 새 모델은 아래 BASE에 한 줄 추가하면 F/KF 파생까지 자동 생성
    ========================================================= */
 const GEN = {
+  // 10세대: Intel 공식 사양 페이지 대조 모델만 LEGACY_BASE에 등록 (구세대 형식: 기본 클럭 · 단일 캐시 · TDP)
+  X10:{label:'10세대',sum:'10세대 Core X',cn:'캐스케이드레이크',socket:'LGA2066',proc:'14nm',maxmem:256,pcie:'3.0',lanes:48,legacy:true},
+  10:{label:'10세대',sum:'10세대 Core',cn:'코멧레이크 리프레시',cn0:'코멧레이크',socket:'LGA1200',proc:'14nm',maxmem:128,pcie:'3.0',lanes:16,legacy:true},
   12:{label:'12세대',sum:'12세대 Core',cn:'앨더레이크',socket:'LGA1700',proc:'Intel 7',maxmem:128,pcie:'5.0/4.0',lanes:20},
   13:{label:'13세대',sum:'13세대 Core',cn:'랩터레이크',socket:'LGA1700',proc:'Intel 7',maxmem:192,pcie:'5.0/4.0',lanes:20},
   14:{label:'14세대',sum:'14세대 Core',cn:'랩터레이크 리프레시',socket:'LGA1700',proc:'Intel 7',maxmem:192,pcie:'5.0/4.0',lanes:20},
@@ -556,7 +569,19 @@ BASE.forEach(r=>{
   if(der==='F'){ DB[model+'F']={...ent,model:model+'F',disp:model+'F',gpu:null,bp:F_POWER[model+'F']||bp}; }
   if(der==='KF'){ const fm=/PLUS$/.test(model)?model.replace('KPLUS','KFPLUS'):model+'F'; DB[fm]={...ent,model:fm,disp:fm.replace(/K?F?PLUS$/,m=>m.replace('PLUS','')+' Plus'),gpu:null}; } // 14600K → 14600KF, 250K Plus → 250KF Plus
 });
-Object.values(DB).forEach(d=>d.chk = ARK_VERIFIED.has(d.model)?'ark':'seed');
+// 10세대 (구세대 형식). 2026-11-06 Intel 공식 사양 페이지(sku/203474) 대조: 14nm · 4C/8T · 3.70/4.40GHz · 6MB · 65W · DDR4-2666 · 128GB · 2채널 · PCIe 3.0 16레인 · LGA1200 · ECC 미지원
+const LEGACY_BASE=[
+  {model:'10105F',gen:10,tier:'i3',p:4,e:0,t:8,pb:3.7,max:4.4,cache:6,bp:65,mem:'DDR4-2666',gpu:null,gf:null,k:false,ht:true,url:'https://www.intel.com/content/www/us/en/products/sku/203474/intel-core-i310105f-processor-6m-cache-up-to-4-40-ghz/specifications.html'}
+];
+LEGACY_BASE.push({model:'10980XE',gen:'X10',tier:'i9',p:18,e:0,t:36,pb:3.0,max:4.8,cache:24.75,bp:165,mem:'DDR4-2933',ch:4,gpu:null,gf:null,k:true,ht:true,kwx:['익스트림에디션','Extreme Edition'],
+  url:'https://www.intel.com/content/www/us/en/products/sku/198017/intel-core-i910980xe-extreme-edition-processor-24-75m-cache-3-00-ghz/specifications.html',
+  notes:[
+    {sev:'ask',t:'최대 클럭 · 공식 표기 2가지',d:'Intel 공식: Max Turbo 4.6GHz, Turbo Boost Max 3.0 4.8GHz. 12세대 이후 등록본처럼 가장 높은 값 4.8GHz를 넣었습니다. 4.6GHz로 쓰는 방식이면 알려 주세요'},
+    {sev:'ask',t:'10세대 Core X · 형식 제안',d:'X 시리즈(HEDT)는 일반 10세대와 소켓·메모리 채널이 달라 첫 항목을 10세대 Core X로 구분했습니다(제안). 오버클럭 지원·내장그래픽 미탑재는 Intel 사양 페이지에 항목이 없어 X 시리즈 일반 특성으로 적었으니 확인하세요'}
+  ]});
+LEGACY_BASE.forEach(r=>{ DB[r.model]={...r,disp:r.model,legacy:true,chk:'ark'}; });
+ARK_VERIFIED.add('10105F'); ARK_VERIFIED.add('10980XE');
+Object.values(DB).forEach(d=>{ if(!d.legacy) d.chk = ARK_VERIFIED.has(d.model)?'ark':'seed'; });
 const arkURL = m => `https://www.intel.com/content/www/us/en/search.html#q=${encodeURIComponent(m)}`;
 
 /* =========================================================
@@ -688,7 +713,8 @@ function genKeywords(ent, P, oldKw){
   }else{
     push(`${ent.tier}-${ent.model}`); push(`코어${ent.tier}`); push('인텔'); push('intel'); push(g.label);
   }
-  push(g.cn); push(cnNoSp); push(g.socket);
+  if(g.cn0) push(g.cn0);
+  push(g.cn); push(cnNoSp); (ent.kwx||[]).forEach(push); push(g.socket);
   // 기존 키워드 중 유효한 것 유지 (포괄어·유통어·다른 모델 제외)
   const removed=[], foreign=[], typo=[];
   (oldKw||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(k=>{
@@ -706,6 +732,12 @@ function genKeywords(ent, P, oldKw){
 function genSummary(ent, cooler){
   // 현행 등록 형식 그대로 (예: 14100 정품벌크 등록본 기준)
   const g=GEN[ent.gen], f=n=>(n%1===0?n.toFixed(1):String(n));
+  if(g.legacy){ // 11세대 이하 형식: 코어 구분(P/E) 없이 코어 수, 기본 클럭, 단일 캐시, TDP
+    const lp=[`${g.sum}(${g.cn})`,`소켓:${g.socket}`,`공정:${g.proc}`,`${ent.p+ent.e}코어`,`${ent.t}스레드`,`기본 클럭:${f(ent.pb)}GHz`,`최대 클럭:${f(ent.max)}GHz`,`캐시:${ent.cache}MB`,`TDP:${ent.bp}W`,
+      `메모리:${ent.mem}`,`메모리 채널:${ent.ch||2}채널`,`최대 메모리:${g.maxmem}GB`,`PCIe ${g.pcie}`,`PCIe 레인:${g.lanes}`,ent.gpu?`내장그래픽:${ent.gpu}(최대 ${f(ent.gf)}GHz)`:'내장그래픽:미탑재'];
+    if(ent.gpu) lp.push('퀵싱크 지원'); if(ent.ht) lp.push('하이퍼스레딩'); if(ent.k) lp.push('오버클럭 지원');
+    lp.push(`쿨러:${cooler.state==='unk'?'[확인 필요]':cooler.text}`); return lp.join('|');
+  }
   const parts=[
     `${g.sum}(${g.cn})`, `소켓:${g.socket}`, `공정:${g.proc}`,
     `${ent.p+ent.e}코어(P${ent.p}+E${ent.e})`, `${ent.t}스레드`,
@@ -872,6 +904,7 @@ function processCpu(I){
 
   // (f) DB 조회 + 현재 중요요약 대조
   if(ent){
+    (ent.notes||[]).forEach(n=>checks.push(n));
     checks.push({sev:'ok',t:'사양 DB 등록 모델',d:`${C(ent.model)} — ${ent.chk==='ark'?'Intel 공식 사양 페이지 개별 대조 완료':'Intel 공식 페이지 개별 대조 전 (등록 전 확인 권장)'}`});
     if(I.spec){
       const cores=(I.spec.match(/(\d+)\s*코어/)||[])[1], thr=(I.spec.match(/스레드\s*:?\s*(\d+)/)||I.spec.match(/(\d+)\s*스레드/)||[])[1];
@@ -907,7 +940,7 @@ function processCpu(I){
     gen.sub=[...head,coolSeg,asSeg,...other].filter(Boolean).join(' | ');
     if(cooler.state==='unk' && exCool) checks.push({sev:'ask',t:'쿨러 문구 현재값 유지',d:`상품명만으로 쿨러 여부를 판정할 수 없어 부가제목의 ${C(exCool)}를 그대로 두었습니다. 판매구성과 맞는지 확인하세요`});
   }
-  if(!I.as && !isServer) checks.push({sev:'unk',t:'A/S 기간 미입력',d:'확인된 A/S 기간이 없으면 부가제목에서 생략 (추정 금지)'});
+  if(!I.as && !isServer && !/※\s*A\/S/.test(I.sub||'')) checks.push({sev:'unk',t:'A/S 기간 미입력',d:'확인된 A/S 기간이 없으면 부가제목에서 생략 (추정 금지)'});
   // 키워드 · 요약
   let kwInfo=null;
   if(ent){
@@ -1457,7 +1490,7 @@ function run(){
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
   if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:OCR_FIX.bySpec?`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 모델 번호가 깨져 읽혀서, 상품명 괄호의 사양(코어·스레드·캐시·클럭)이 서버 사양 DB의 이 모델과 정확히 같을 때만 제안했습니다. 원본 캡처와 반드시 대조하세요`:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
   if(OCR_NOTE && OCR_SPEC && I.spec) extra.push({sev:'ask',t:'캡처에서 읽은 중요요약 사용',d:'작은 글씨라 숫자·모델명이 틀리게 읽힐 수 있습니다(예: 225U). 원본과 반드시 대조하거나, 구관리자의 중요요약을 복사해 "기존 정보와 비교"에 붙여 넣으세요.'});
-  if(OCR_NOTE && OCR_NOTES.length) extra.push({sev:'ask',t:'캡처 인식 보정 · 메모리 표기',d:OCR_NOTES.map(n=>`${C(n.from)} → ${C(n.to)}`).join(' ')+' — 규격(PC 번호)과 짝이 맞는 표기로 고쳤습니다. 원본 캡처와 반드시 대조하세요'});
+  if(OCR_NOTE && OCR_NOTES.length) extra.push({sev:'ask',t:'캡처 인식 보정 · 상품명 표기',d:OCR_NOTES.map(n=>`${C(n.from)} → ${C(n.to)}`).join(' ')+' — '+(OCR_NOTES.some(n=>n.drop)?'깨져 읽힌 괄호는 제외했습니다(모델 번호와 판매구성만 사용). ':'')+(OCR_NOTES.some(n=>!n.drop)?'규격(PC 번호)과 짝이 맞는 표기로 고쳤습니다. ':'')+'원본 캡처와 반드시 대조하세요'});
   hygieneChecks(I).forEach(c=>extra.push(c));
   if(OCR_NOTE && OCR_KWDROP) extra.push({sev:'warn',t:'인식된 키워드 일부 제외',d:`읽을 수 없는 글자가 섞인 항목 ${OCR_KWDROP}개를 비교에서 제외했습니다. 원본 키워드를 "기존 정보와 비교"에 직접 붙여넣으면 정확히 점검됩니다.`});
   if(cat==='monitor'){
@@ -1629,6 +1662,14 @@ function parseShotText(text){
   out.name=out.name.replace(/×/g,'X');
   // 메모리 이름: DDR 글자가 숫자로 깨진 경우(예: DDR4 → 0084)와 끝 괄호 보정 — 보정한 사실은 화면에 확인 요청으로 표시
   out.notes=[];
+  { const m1=out.name.match(/^1([3579])-(?=[가-힣])/); if(m1){ out.notes.push({from:'1'+m1[1]+'-',to:'i'+m1[1]+'-'}); out.name=out.name.replace(/^1[3579]-/,'i'+m1[1]+'-'); } }
+  // CPU 상품명: 괄호 안 코드네임이 깨져 읽힌 경우(세로선·한글 아닌 문자 뒤섞임)는 제외 — 모델 번호와 판매구성만 사용
+  if(/\b\d{4,5}[A-Z]{0,2}\b/.test(out.name) && !/Processor|DDR|PC\d-\d{5}/i.test(out.name)){
+    out.name=out.name.replace(/\s*\(([^()]*)\)/g,(m,inner)=>{
+      const hang=(inner.match(/[가-힣]/g)||[]).length, lat=(inner.match(/[A-Za-z0-9]/g)||[]).length;
+      if(/[|\\{}_]/.test(inner) || (lat>=4 && hang>0 && /[A-Za-z]\d[A-Za-z]|\d[A-Za-z]\d/.test(inner))){ out.notes.push({from:'('+inner+')',to:'제외',drop:true}); return ''; }
+      return m; }).replace(/\s{2,}/g,' ').trim();
+  }
   { const pm=out.name.match(/PC([2345])-\d{5}/);
     if(pm){
       let t0=out.name.match(/(^|\s)([0OoDdB8RrIl1]{3}\d)(?=\s)/);
@@ -1681,7 +1722,11 @@ function parseShotText(text){
   if(out.kw){ const t=out.kw.split(',').map(x=>x.trim()).filter(Boolean), g=t.filter(x=>/^[가-힣A-Za-z0-9 .+\-®™]+$/.test(x)); out.kwDropped=t.length-g.length; out.kw=g.join(','); }
   return out;
 }
+let LAST_FILE=null;
+function flashResult(){ const g=$('gen'); if(!g) return; g.classList.remove('flash'); void g.offsetWidth; g.classList.add('flash'); }
+function toast(msg){ let t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.setAttribute('role','status'); document.body.appendChild(t); } t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1400); }
 async function handleImage(file){
+  LAST_FILE=file;
   const st=$('ocrStatus'); const dz=$('drop');
   const url=URL.createObjectURL(file);
   dz.innerHTML=`<div class="drop-t">캡처 인식 중…</div><div class="drop-s">처음 한 번은 인식 엔진을 내려받느라 몇 초 걸립니다</div><img src="${url}" alt="입력 캡처">`;
@@ -1726,14 +1771,19 @@ function bindFile(){ const fi=$('file'); if(fi) fi.onchange=()=>{ if(fi.files[0]
   const dz=$('drop'); bindFile();
   dz.addEventListener('click',()=>dz.focus());
   { const way=dz.closest('.way'); if(way) way.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,select,textarea,label')) dz.focus(); }); }   // 캡처 영역 바탕을 눌러도 붙여넣기 준비 상태로   // 클릭해도 파일 창을 열지 않음 (붙여넣기는 화면 어디서나 가능)
+  // Enter: 캡처 영역에서는 마지막 캡처를 다시 인식, 입력칸에서는 바로 다시 조회
+  dz.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(LAST_FILE){ toast('↻ 마지막 캡처를 다시 조회합니다'); handleImage(LAST_FILE); } else { const fi=$('file'); if(fi) fi.click(); } } });
+  ['name','maker','brand','sub'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); clearTimeout(T_RUN); run(); flashResult(); toast('↻ 다시 조회했습니다'); } }));
   $('pick').addEventListener('click',()=>{ const fi=$('file'); if(fi) fi.click(); });
   // 드래그 중 반응: 파일을 끌고 화면에 들어오면 영역이 깜빡이고, 영역 위에 오면 '여기에 놓으세요'가 뜸
   let dragN=0;
   const isFileDrag=e=>[...((e.dataTransfer&&e.dataTransfer.types)||[])].includes('Files');
-  document.addEventListener('dragenter',e=>{ if(isFileDrag(e)) dz.classList.add('ready'); });
+  let docN=0;   // 문서 전체의 드래그 진입 횟수 (자식 요소를 넘나들 때 깜빡이지 않도록 짝으로 셈)
+  document.addEventListener('dragenter',e=>{ docN++; if(isFileDrag(e)) dz.classList.add('ready'); });
   document.addEventListener('dragover',e=>{ if(isFileDrag(e)) e.preventDefault(); });   // 영역 밖에 놓아도 브라우저가 파일을 열지 않게
-  document.addEventListener('dragleave',e=>{ if(!e.relatedTarget){ dz.classList.remove('ready','over'); dragN=0; } });
-  document.addEventListener('drop',e=>{ if(isFileDrag(e)) e.preventDefault(); dz.classList.remove('ready','over'); dragN=0; });
+  document.addEventListener('dragleave',e=>{ docN=Math.max(0,docN-1); if(!docN){ dz.classList.remove('ready','over'); dragN=0; } });
+  document.addEventListener('drop',e=>{ if(isFileDrag(e)) e.preventDefault(); dz.classList.remove('ready','over'); dragN=0; docN=0; });
+  document.addEventListener('dragend',()=>{ dz.classList.remove('ready','over'); dragN=0; docN=0; });
   dz.addEventListener('dragenter',e=>{ e.preventDefault(); dragN++; dz.classList.add('over'); });
   dz.addEventListener('dragover',e=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy'; dz.classList.add('over'); });
   dz.addEventListener('dragleave',()=>{ dragN=Math.max(0,dragN-1); if(!dragN) dz.classList.remove('over'); });
