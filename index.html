@@ -1752,7 +1752,7 @@ function flashResult(){ const g=$('gen'); if(!g) return; g.classList.remove('fla
 function toast(msg){ let t=$('toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.setAttribute('role','status'); document.body.appendChild(t); } t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1400); }
 async function handleImage(file){
   LAST_FILE=file;
-  const st=$('ocrStatus'); const dz=$('drop');
+  const st=$('ocrStatus'); const dz=$('drop'); dz.classList.remove('ready');
   const url=URL.createObjectURL(file);
   dz.innerHTML=`<div class="drop-t">캡처 인식 중…</div><div class="drop-s">처음 한 번은 인식 엔진을 내려받느라 몇 초 걸립니다</div><img src="${url}" alt="입력 캡처">`;
   st.className='ocr-st busy'; st.textContent='① 인식 엔진 준비 (최초 1회 수 초 소요)'; setRunState('busy','처리 중 · 캡처 인식');
@@ -1812,8 +1812,25 @@ function showNameCrop(img,data,k,name){
 function bindFile(){ const fi=$('file'); if(fi) fi.onchange=()=>{ if(fi.files[0]) handleImage(fi.files[0]); }; }
 (function initDrop(){
   const dz=$('drop'); bindFile();
-  dz.addEventListener('click',()=>dz.focus());
-  { const way=dz.closest('.way'); if(way) way.addEventListener('click',e=>{ if(!e.target.closest('button,a,input,select,textarea,label')) dz.focus(); }); }   // 캡처 영역 바탕을 눌러도 붙여넣기 준비 상태로   // 클릭해도 파일 창을 열지 않음 (붙여넣기는 화면 어디서나 가능)
+  // 클릭하면 기존 캡처·입력값·결과를 비우고 새 캡처를 받을 준비 상태로 전환
+  function armDrop(){
+    const had=!!(LAST_FILE||dz.querySelector('img')||$('name').value);
+    if(had){
+      LAST_FILE=null; clearTimeout(T_RUN);
+      ['name','maker','brand','sub','kw','spec','as','cooler'].forEach(k=>{ const el=$(k); if(el) el.value=''; });
+      const cs=$('catSel'); if(cs) cs.value='';
+      OCR_NOTE=false; OCR_FIX=null; OCR_KWDROP=0; OCR_NOTES=[]; OCR_SPEC=false;
+      dz.innerHTML='<div class="drop-t">캡처를 끌어다 놓거나 <b>Ctrl+V</b>로 붙여넣기</div><div class="drop-s">상품명이 보이게 캡처하면 모델 번호를 읽어 나머지 필드를 채웁니다</div><input type="file" id="file" accept="image/*" hidden>'; bindFile();
+      const st=$('ocrStatus'); if(st){ st.className='ocr-st'; st.textContent=''; }
+      const cr=$('ocrCrop'); if(cr) cr.innerHTML='';
+      try{ run(); }catch(e){}
+      toast('이전 상품을 지웠습니다 · 새 캡처를 붙여넣거나 끌어다 놓으세요');
+    }
+    dz.classList.add('ready'); dz.focus();
+  }
+  dz.addEventListener('click',armDrop);
+  dz.addEventListener('blur',()=>dz.classList.remove('ready'));
+  { const way=dz.closest('.way'); if(way) way.addEventListener('click',e=>{ if(e.target.closest('button,a,input,select,textarea,label,#drop')) return; armDrop(); }); }   // 캡처 영역 바탕을 눌러도 붙여넣기 준비 상태로   // 클릭해도 파일 창을 열지 않음 (붙여넣기는 화면 어디서나 가능)
   // Enter: 캡처 영역에서는 마지막 캡처를 다시 인식, 입력칸에서는 바로 다시 조회
   dz.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(LAST_FILE){ toast('↻ 마지막 캡처를 다시 조회합니다'); handleImage(LAST_FILE); } else { const fi=$('file'); if(fi) fi.click(); } } });
   ['name','maker','brand','sub'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.isComposing){ e.preventDefault(); clearTimeout(T_RUN); run(); flashResult(); toast('↻ 다시 조회했습니다'); } }));
