@@ -1048,7 +1048,7 @@ function parseSetName(name){
     const rm=N.match(/(\d+)\s*GB\s*구성\s*\(\s*(\d+)\s*\+\s*(\d+)\s*\)/);
     if(rm){ o.ramTotal=+rm[1]; o.ram=(+rm[2]===+rm[3])?`${rm[1]}GB(${rm[2]}GB x2)`:null; }
     const sm=N.match(/SSD\s*(\d+\s*(?:TB|GB))/i); o.ssd=sm?sm[1].replace(/\s/g,'').toUpperCase():null;
-    const om=N.match(/Win\s?\d+[A-Za-z]*(?:\s*DSP\s*설치)?/); o.os=om?om[0].replace(/^Win\s/,'Win'):null;
+    const om=N.match(/Win\s?\d+[A-Za-z]*(?:\s*DSP\s*설치)?/i); o.os=om?om[0].replace(/^Win\s/i,'Win'):null;
   }
   [...N.matchAll(/\[([^\]]+)\]/g)].forEach(m=>{ const t=m[1];
     const a=t.match(/(\d+)\s*TB\s*SSD\s*추가|SSD\s*(\d+)\s*TB\s*추가/i); if(a) o.opts.push({k:'ssdAdd',v:+(a[1]||a[2]),t});
@@ -1189,6 +1189,11 @@ function run(){
   const I={maker:v('maker'),brand:v('brand'),name:v('name'),sub:v('sub'),kw:v('kw'),spec:v('spec'),as:v('as'),cooler:v('cooler'),ocr:OCR_NOTE};
   const G=$('gen'), K=$('checksBox'), M=$('mode'), S=$('src');
   if(!I.name){ G.innerHTML=`<div class="gen-row"><div class="gen-v na">캡처를 넣거나 상품명을 입력하면 상품명 · 브랜드 · 부가제목 · 키워드 · 중요요약설명이 여기에 채워집니다.</div></div>`; K.innerHTML=''; M.textContent=''; S.innerHTML=''; setRunState('idle','입력 대기'); return; }
+  if(OCR_NOTE && oddCount(I.name)>=2){
+    G.innerHTML=`<div class="gen-row"><div class="gen-v na">캡처에서 상품명을 제대로 읽지 못했습니다. 상품명 칸의 글자를 원본대로 고치면 바로 다시 생성됩니다.</div></div>`;
+    K.innerHTML=renderChecks([{sev:'err',t:'캡처 인식 불량',d:`인식값 ${C(I.name)} — 상품명에 있을 수 없는 글자가 섞여 있어 결과를 만들지 않음. 캡처를 더 크게 다시 찍거나 상품명을 직접 입력`}]);
+    M.textContent=''; S.innerHTML=''; setRunState('err','캡처 인식 불량'); return;
+  }
   const cat=detectCategory(I);
   const symChk=nameSymbolCheck(I.name,cat);
   let g='', src='';
@@ -1290,10 +1295,32 @@ function preprocess(img,kk){
   const d=cx.getImageData(0,0,w,h), p=d.data;
   const gray=new Uint8ClampedArray(w*h);
   for(let i=0;i<w*h;i++) gray[i]=0.299*p[i*4]+0.587*p[i*4+1]+0.114*p[i*4+2];
+  const darkRows=[];
   for(let y=0;y<h;y++){ let dark=0; for(let x=0;x<w;x++) if(gray[y*w+x]<90) dark++;
-    if(dark/w>0.35) for(let x=0;x<w;x++) gray[y*w+x]=255-gray[y*w+x]; }
+    if(dark/w>0.35){ darkRows.push(y); } }
+  // 강조된 줄(띠)의 위치와 가로 범위를 기록 (반전하기 전에)
+  const bands=[]; let bi=0;
+  while(bi<darkRows.length){ let bj=bi; while(bj+1<darkRows.length && darkRows[bj+1]-darkRows[bj]<=2) bj++;
+    const y0=darkRows[bi], y1=darkRows[bj]+1; if(y1-y0>=5*k){ let x0=w,x1=0;
+      for(let x=0;x<w;x++){ let c=0; for(let y=y0;y<y1;y++) if(gray[y*w+x]<90) c++; if(c/(y1-y0)>0.45){ if(x<x0)x0=x; if(x>x1)x1=x; } }
+      if(x1>x0) bands.push({y0,y1,x0,x1}); }
+    bi=bj+1; }
+  darkRows.forEach(y=>{ for(let x=0;x<w;x++) gray[y*w+x]=255-gray[y*w+x]; });
   for(let i=0;i<w*h;i++){ const g=gray[i]>150?255:gray[i]; p[i*4]=p[i*4+1]=p[i*4+2]=g; p[i*4+3]=255; }
-  cx.putImageData(d,0,0); return cv;
+  cx.putImageData(d,0,0); cv._bands=bands; return cv;
+}
+// 인식 품질: 상품명에 있을 수 없는 글자(ㅅ ₩ 『 = 등)가 섞이면 인식 불량
+function oddCount(t){ return ((t||'').match(/[^A-Za-z0-9가-힣\s().,+\-®™%\/\[\]:*×·~&]/g)||[]).length; }
+function nameScore(f){ if(!f||!f.name) return 99; return oddCount(f.name)*3+(f.nameOk===false?2:0)+(f.fix?1:0); }
+// 강조된 줄만 잘라 한 줄 모드로 다시 인식
+async function readBand(cv,b){
+  const pad=10, x0=Math.max(0,b.x0-4), x1=Math.min(cv.width,b.x1+4);
+  const c=document.createElement('canvas'); c.width=(x1-x0)+pad*2; c.height=(b.y1-b.y0)+pad*2;
+  const cx=c.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,c.width,c.height);
+  cx.drawImage(cv,x0,b.y0,x1-x0,b.y1-b.y0,pad,pad,x1-x0,b.y1-b.y0);
+  await OCR_WORKER.setParameters({tessedit_pageseg_mode:'7'});
+  try{ const r=await OCR_WORKER.recognize(c); return (r.data.text||'').replace(/\s+/g,' ').trim(); }
+  finally{ await OCR_WORKER.setParameters({tessedit_pageseg_mode:'3'}); }
 }
 // OCR 텍스트 → 필드 (신관리자 상품정보 화면 / 상품 목록 화면)
 function parseShotText(text){
@@ -1370,19 +1397,28 @@ async function handleImage(file){
     if(!OCR_WORKER){ OCR_WORKER=await Tesseract.createWorker('kor+eng'); }
     st.textContent='② 글자 인식 중…';
     const img=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=url; });
-    // 서버 상품명의 모델 번호가 깨져 읽히면 배율을 바꿔 다시 인식 (3배 → 4배 → 2배)
-    let data=null, f=null;
+    // 상품명이 깨져 읽히면 배율을 바꿔 다시 인식 (3배 → 4배 → 2배), 그래도 깨지면 강조된 줄만 잘라 한 줄 모드로 인식
+    let best=null;
     for(const kk of [3,4,2]){
-      const r=await OCR_WORKER.recognize(preprocess(img,kk)); const pf=parseShotText(r.data.text);
-      if(!data || (pf.name && pf.nameOk && !pf.fix && !(f&&f.nameOk&&!f.fix))){ data=r.data; f=pf; }
-      if(pf.name && pf.nameOk && !pf.fix) break;
-      if(pf.name && !/Processor/i.test(pf.name)) break;   // 서버 형식이 아니면 재시도 불필요
-      st.textContent='② 글자 인식 중… (모델 번호 재확인)';
+      const cv=preprocess(img,kk); const r=await OCR_WORKER.recognize(cv); const pf=parseShotText(r.data.text);
+      const sc=nameScore(pf);
+      if(!best || sc<best.sc) best={data:r.data,f:pf,sc,cv};
+      if(sc===0) break;
+      st.textContent='② 글자 인식 중… (다시 확인)';
     }
+    if(best.sc>=3 && best.cv._bands && best.cv._bands.length){
+      st.textContent='② 상품명 줄만 다시 인식 중…';
+      for(const b of best.cv._bands.slice(0,3)){
+        try{ const t=await readBand(best.cv,b); if(!t) continue; const f2=parseShotText('상품명 :\n'+t); const sc2=nameScore(f2);
+          if(f2.name && sc2<best.sc){ best.f=Object.assign({},best.f,{name:f2.name,fix:f2.fix,nameOk:f2.nameOk}); best.sc=sc2; } }catch(e){}
+      }
+    }
+    const data=best.data, f=best.f;
     if(!f.name){ throw new Error('상품명을 찾지 못했습니다. 상품명이 보이도록 다시 캡처하거나 직접 입력해 주세요.'); }
     $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value='';
     OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0;
-    st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (신뢰도 ${Math.round(data.confidence)}%) — 상품명 칸을 원본과 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`;
+    if(oddCount(f.name)>=2){ st.className='ocr-st bad'; st.textContent='⚠ 상품명을 제대로 읽지 못했습니다. 상품명 칸을 원본대로 고쳐 주세요.'; }
+    else{ st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (신뢰도 ${Math.round(data.confidence)}%) — 상품명 칸을 원본과 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`; }
     dz.innerHTML=`<div class="drop-t">다른 캡처를 끌어다 놓거나 <b>Ctrl+V</b></div><img src="${url}" alt="입력 캡처"><input type="file" id="file" accept="image/*" hidden>`;
     bindFile(); run();
   }catch(e){
