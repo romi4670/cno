@@ -671,6 +671,7 @@ function parseCpuName(name){
   const plus=/\bPLUS\b|플러스/i.test(outside);
   const groups=parens.map(p=>{
     if(SERVER_SPEC_RE.test(p)||/\d+\s*C\b.*\d+\s*T\b/i.test(p)) return {text:p,kind:'spec'};
+    if(/^Processor\s+\d+(\.\d+)?\s*M\s*Cache\s*,\s*\d+(\.\d+)?\s*GHz$/i.test(p)) return {text:p,kind:'proc'};
     if(SALE_RE.test(p)) return {text:p,kind:'sale'};
     const c=canonCN(p);
     if(CN_SET.has(c)) return {text:p,kind:'cn',canon:c};
@@ -774,14 +775,18 @@ const SERVER_DB={
   '6747P':{...XEON6_COMMON,cores:48,threads:96,base:2.7,allcore:3.8,max:3.9,l3:288,tdp:330,url:'https://www.intel.com/content/www/us/en/products/sku/241825/intel-xeon-6747p-processor-288m-cache-2-70-ghz/specifications.html'},
   '6767P':{...XEON6_COMMON,cores:64,threads:128,base:2.4,allcore:3.6,max:3.9,l3:336,tdp:350,pk:'PK8072006269900',url:'https://www.intel.com/content/www/us/en/products/sku/241845/intel-xeon-6767p-processor-336m-cache-2-40-ghz/specifications.html'}
 };
-Object.keys(SERVER_DB).forEach(m=>{ SERVER_DB[m].model=m; SERVER_DB[m].series=m.slice(0,2)+'00P'; });
+/* Xeon 스케일러블 3세대(아이스레이크-SP) — Intel 공식 사양 페이지 대조 (2026-11-06). 형식은 담당자가 제시한 예시 기준(제안) */
+SERVER_DB['5320']={fam:'gold3',brand:'Intel® Xeon® Gold',tier:'골드',gen:'3세대',cn:'아이스레이크-SP',cnEn:'Ice Lake',cnKw:['아이스레이크','아이스레이크-SP'],socket:'LGA4189',proc:'10nm',cores:26,threads:52,base:2.2,max:3.4,l3:39,tdp:185,scal:'2S',upi:'3링크(11.2GT/s)',mem:'DDR4-2933',ch:8,maxmem:'6TB',ecc:true,pcie:'4.0',lanes:64,feat:'Optane/SGX/DL Boost 지원',chk:'ark',url:'https://www.intel.com/content/www/us/en/products/sku/215285/intel-xeon-gold-5320-processor-39m-cache-2-20-ghz/specifications.html'};
+Object.keys(SERVER_DB).forEach(m=>{ SERVER_DB[m].model=m; if(!SERVER_DB[m].fam) SERVER_DB[m].series=m.slice(0,2)+'00P'; });
 /* 서버 키워드 규칙 (담당자 확정, 순서 고정):
    모델명, Xeon 모델명, Xeon모델명, 인텔 오더코드(PK…), 영문 코드네임, 한글 코드네임(붙임), N코어, 서버CPU, 인텔, 제온, 제온6, 소켓 */
 function genXeonKeywords(e, oldKw){
   const old=(oldKw||'').split(',').map(x=>x.trim()).filter(Boolean);
   const pkOld=old.find(k=>/^PK\d{8,}$/i.test(k));
   const pk=e.pk||(pkOld?pkOld.toUpperCase():null);
-  const out=[e.model,'Xeon '+e.model,'Xeon'+e.model,pk,e.cnEn,e.cn.replace(/\s/g,''),e.cores+'코어','서버CPU','인텔','제온','제온6',e.socket].filter(Boolean);
+  const out=(e.fam==='gold3'
+    ? [e.model,'Xeon'+e.model,'제온'+e.model,pk,'인텔','intel','제온','Xeon',e.tier,e.brand.replace(/^.*Xeon®\s*/,''),e.gen,...e.cnKw,e.socket]
+    : [e.model,'Xeon '+e.model,'Xeon'+e.model,pk,e.cnEn,e.cn.replace(/\s/g,''),e.cores+'코어','서버CPU','인텔','제온','제온6',e.socket]).filter(Boolean);
   const low=out.map(x=>x.toLowerCase().replace(/\s/g,''));
   const foreign=[], extra=[];
   old.forEach(k=>{
@@ -800,6 +805,7 @@ function serverCooler(I){
 }
 function genServerSummary(e,cooler){
   const f=n=>n.toFixed(1);
+  if(e.fam==='gold3') return [`${e.gen} Xeon Scalable(${e.cn})`,`소켓:${e.socket}`,`공정:${e.proc}`,`${e.cores}코어`,`${e.threads}스레드`,`기본 클럭:${f(e.base)}GHz`,`최대 클럭:${f(e.max)}GHz`,`L3 캐시:${e.l3}MB`,`기본 TDP:${e.tdp}W`,`소켓 구성:최대 ${e.scal}`,`UPI:${e.upi}`,`메모리:${e.mem}`,`메모리 채널:${e.ch}채널`,`최대 메모리:${e.maxmem}`,e.ecc?'ECC 지원':null,`PCIe ${e.pcie}`,`PCIe 레인:${e.lanes}`,e.feat,`쿨러:${cooler.state==='unk'?'[확인 필요]':cooler.text}`].filter(Boolean).join('|');
   return [`Xeon 6 ${e.series} 시리즈(${e.cn})`,`소켓:${e.socket}`,`공정:${e.proc}`,`${e.cores}코어`,`${e.threads}스레드`,
     `기본 클럭:${f(e.base)}GHz`,`올코어 터보:${f(e.allcore)}GHz`,`최대 클럭:${f(e.max)}GHz`,`L3 캐시:${e.l3}MB`,`기본 TDP:${e.tdp}W`,
     `소켓 구성:최대 ${e.scal}`,`UPI:${e.upi}`,`메모리:${e.mem}`,`메모리 채널:${e.ch}채널`,`최대 메모리:${e.maxmem}`,
@@ -844,7 +850,7 @@ function processCpu(I){
   const checks=[], P=parseCpuName(I.name);
   const ent=DB[P.model]||null;
   const sent=SERVER_DB[P.model]||null;
-  const isServer = P.isServerFmt || /XEON|제온/i.test(I.brand) || /^[WE]\d?-\d{4}/.test(P.model);
+  const isServer = P.isServerFmt || !!sent || /XEON|제온/i.test(I.brand+' '+I.name) || /^[WE]\d?-\d{4}/.test(P.model);
   const inf=inferCodename(I.maker,(isServer&&!/XEON|제온/i.test(I.brand))?(I.brand+' Xeon'):I.brand,P.model);
   const ask=(t,d)=>checks.push({sev:'ask',t,d});
 
@@ -864,10 +870,20 @@ function processCpu(I){
   }else if(!isServer){
     if(inf.cn) ask('코드네임 누락',`상품명에 코드네임 없음. 참고: ${C('('+inf.cn+')')}`);
     else checks.push({sev:'unk',t:'코드네임 없음 / 확인불가',d:esc(inf.note)});
+  }else if(sent&&sent.fam){
+    checks.push({sev:'ok',t:'서버 CPU 코드네임 · DB 확인',d:`${C(sent.cn)} (${esc(sent.gen)} Xeon Scalable) — Intel 공식 사양 페이지 기준. 상품명에는 표기하지 않는 형식`});
   }else if(inf.cn){
     checks.push({sev:'ok',t:'서버 CPU 세대 참고',d:`${C(inf.cn)} — ${esc(inf.note)} (상품명에는 표기하지 않는 형식)`});
   }
 
+  { const pg=P.groups.find(g=>g.kind==='proc');
+    if(pg){ const m=pg.text.match(/(\d+(?:\.\d+)?)\s*M\s*Cache\s*,\s*(\d+(?:\.\d+)?)\s*GHz/i);
+      if(sent){ const bad=[];
+        if(parseFloat(m[1])!==sent.l3) bad.push(`캐시 ${C(m[1]+'M')} ↔ DB ${C(sent.l3+'M')}`);
+        if(Math.abs(parseFloat(m[2])-sent.base)>0.001) bad.push(`클럭 ${C(m[2]+' GHz')} ↔ DB ${C(sent.base.toFixed(2)+' GHz')}`);
+        if(bad.length) checks.push({sev:'err',t:'상품명 사양 괄호 ↔ 공식 DB 불일치',d:bad.join('<br>')});
+        else checks.push({sev:'ok',t:'상품명 사양 괄호 ↔ 공식 DB 일치',d:`${C(pg.text)} — 캐시·기본 클럭 (Intel 공식 사양 페이지)`});
+      } else checks.push({sev:'ok',t:'서버 Processor 형식 인정',d:'형식 유지 (이 모델은 서버 사양 DB 미등록 — 값 검증 없음)'}); } }
   // (c) 서버 Processor 형식 내부 오류 (형식 자체는 정상으로 인정)
   const specG=P.groups.find(g=>g.kind==='spec');
   if(P.isServerFmt){
@@ -929,12 +945,12 @@ function processCpu(I){
   }
 
   // (g) 브랜드 대조
-  const brandNew = ent?brandOf(ent,P.model):(isServer?serverBrandOf(P.model):brandOf(null,((I.name+' '+I.brand).match(/i[3579]/i)||[''])[0]));
+  const brandNew = (sent&&sent.brand)?sent.brand:ent?brandOf(ent,P.model):(isServer?serverBrandOf(P.model):brandOf(null,((I.name+' '+I.brand).match(/i[3579]/i)||[''])[0]));
   if(brandNew && I.brand && I.brand.replace(/\s/g,'')!==brandNew.replace(/\s/g,'')) checks.push({sev:'warn',t:'브랜드 표기 변경 제안',d:`${C(I.brand)} → ${C(brandNew)}`});
 
   // ---- 생성 ----
   const gen={};
-  gen.brand = brandNew;
+  gen.brand = (sent&&sent.brand)||brandNew;
   // 부가제목
   if(isServer){
     gen.sub = null; // 서버 부가제목은 공급 조건(Tray·리드타임·취소 규정) → 현재값 유지
@@ -1556,6 +1572,11 @@ function run(){
       const disp = r.ent?r.ent.disp:(r.P.rawModel||r.P.model);
       if(cn){ const sugg=`${disp} (${cn})${r.saleG?` (${r.saleG})`:''}`;
         if(sugg.replace(/\s/g,'')!==I.name.replace(/\s/g,'')){ nameOut=sugg; tag=['ask','참고안 · 담당 승인 후 수정']; } }
+    }else if(r.sent){
+      const e=r.sent, std=`${e.model} Processor (${e.cores}C, ${e.threads}T, ${e.l3}M Cache, ${e.base.toFixed(2)} GHz)`;
+      if(std.replace(/\s/g,'')!==I.name.replace(/\s/g,'')){ nameOut=std; tag=['ask','참고안 · 담당 승인 후 수정'];
+        r.checks.unshift({sev:'ask',t:'상품명 표준 형식 · 수정 제안',d:`서버 CPU 등록 형식은 ${C('모델 Processor (xC, yT, zM Cache, a.bc GHz)')}입니다. 현재 ${C(I.name)} → ${C(std)} (값은 Intel 공식 사양 기준). ${C('Box')}·${C('Tray')} 같은 구분은 상품명이 아니라 부가제목에 적습니다. 브랜드(${esc(e.brand||'')})와 제품군은 브랜드·키워드로 들어갑니다.`}); }
+      else if(r.checks.some(c=>c.sev==='ask')) tag=['ask','확인 요청 있음'];
     }else if(r.checks.some(c=>c.sev==='ask')) tag=['ask','확인 요청 있음'];
     if(symChk) r.checks.push(symChk);
     g+=genRow('name','상품명',nameOut,'',tag);
@@ -1635,7 +1656,15 @@ function preprocess(img,kk){
 }
 // 인식 품질: 상품명에 있을 수 없는 글자(ㅅ ₩ 『 = 등)가 섞이면 인식 불량
 function oddCount(t){ return ((t||'').match(/[^A-Za-z0-9가-힣\s().,+\-®™%\/\[\]:*×·~&]/g)||[]).length; }
-function nameScore(f){ if(!f||!f.name) return 99; return oddCount(f.name)*3+(f.nameOk===false?2:0)+(f.fix?1:0); }
+// 서버 CPU 이름은 "(Processor 39M Cache, 2.20 GHz)" 또는 "Processor (24C, 48T, 144M Cache, 2.40 GHz)" 꼴이어야 정상. 깨졌으면 불량으로 본다
+function srvShapeBad(n){
+  if(!/Xeon|제온|Cache|GHz|Processo|Proc|Cach|GH\w|enon|\d+\s*M\s+[A-Za-z_]/i.test(n)) return false;
+  const good=/\(Processor\s+\d+(\.\d+)?\s*M\s*Cache\s*,\s*\d+\.\d+\s*GHz\)/i.test(n) || /Processor\s*\(\s*\d+C\s*,\s*\d+T\s*,\s*\d+M\s*Cache\s*,\s*\d+\.\d+\s*GHz\s*\)/i.test(n);
+  if(!good) return true;
+  const nums=(n.replace(/\([^)]*\)/g,' ').match(/\b\d{4}[A-Z]{0,2}\b/g)||[]);
+  return new Set(nums).size>1;
+}
+function nameScore(f){ if(!f||!f.name) return 99; return oddCount(f.name)*3+(f.nameOk===false?2:0)+(f.fix?1:0)+(srvShapeBad(f.name)?3:0); }
 // 강조된 줄만 잘라 한 줄 모드로 다시 인식
 async function readBand(cv,b){
   const pad=10, x0=Math.max(0,b.x0-4), x1=Math.min(cv.width,b.x1+4);
@@ -1662,7 +1691,8 @@ function parseShotText(text){
     if(iS>=0){ const end=iK>=0?iK:lines.length; out.sub=lines.slice(iS+1,end).filter(l=>/[※\[]/.test(l)).join(' | '); }
     if(iK>=0){ const same=after(lines[iK]); out.kw=(same&&!/키워드/.test(same))?same:(lines[iK+1]&&!/이벤트/.test(lines[iK+1])?lines[iK+1]:''); }
   }else{ // 상품 목록 화면: [제조사] 상품명 / ※ 부가제목
-    const iL=idx(/\[[^\]]{1,12}\]\s*\S/);
+    let iL=idx(/\[[^\]]{1,12}\]\s*\S/);
+    if(iL<0){ const j=idx(/인텔\s*[\]|)Il1]\s*\S/); if(j>=0){ lines[j]=lines[j].replace(/^.*?(인텔)\s*[\]|)Il1]\s*/,'[$1] '); iL=j; } }   // 괄호가 깨져 읽힌 [인텔]
     if(iL>=0){ const m=lines[iL].match(/\[([^\]]{1,12})\]\s*(.+)$/); out.maker=m[1]; out.name=m[2]; }
     const iX=lines.findIndex((l,i)=>i>iL && /※/.test(l)); if(iX>=0) out.sub=lines[iX];
     else { const iY=lines.findIndex((l,i)=>i>iL && /^[^\[\]]{0,6}\[[가-힣 ]{3,14}\]\s*$/.test(l)); if(iY>=0) out.sub=lines[iY].match(/\[[가-힣 ]{3,14}\]/)[0]; }
@@ -1672,9 +1702,14 @@ function parseShotText(text){
   }
   if(!out.name && iN<0){ const c=lines.find(l=>/\b\d{4,5}[A-Z]{0,2}\b|Processor/.test(l) && !/제조사|브랜드|부가제목|키워드|이벤트/.test(l)); if(c) out.name=c; }
   // OCR 교정: 문자 혼동이 확정적인 경우만
-  out.name=out.name.replace(/×/g,'X');
+  out.name=out.name.replace(/×/g,'X').replace(/\s+®/g,'®');
+  // 왼쪽 로고(intel.)가 같은 줄로 읽히거나 [인텔] 표기가 상품명에 딸려온 경우 정리
+  { const lm=out.name.match(/^(?:\s*(?:intel|inte1|lntel)\.?\s*[|]?\s*)?[\[|(]?\s*인텔\s*[\]|)]\s*(.+)$/i);
+    if(lm){ out.name=lm[1].trim(); if(!out.maker) out.maker='인텔'; } }
+  { const xm=out.name.match(/^(.{1,10}?)\s*(Xeon\b.*)$/i);   // 로고 조각이 앞에 붙은 Xeon 이름: "|ntelk Xeon® Gold …" → "Intel® Xeon® Gold …"
+    if(xm && !/^Intel\s*®?$/i.test(xm[1].trim()) && /[^A-Za-z\s®]|^(?:int|inte|lnt|\|)/i.test(xm[1])){ out.notes=out.notes||[]; out.notes.push({from:xm[1].trim()+' Xeon',to:'Intel® Xeon'}); out.name='Intel® '+xm[2].replace(/^Xeon(?!®)\s*/i,'Xeon® ').replace(/^xeon/,'Xeon'); } }
   // 메모리 이름: DDR 글자가 숫자로 깨진 경우(예: DDR4 → 0084)와 끝 괄호 보정 — 보정한 사실은 화면에 확인 요청으로 표시
-  out.notes=[];
+  out.notes=out.notes||[];
   // 모델 번호 끝자리 혼동(E↔6·8·F, 0↔O 등): 사양 DB에서 글자 혼동만으로 달라지는 모델이 딱 하나일 때만 제안
   if(typeof DB!=='undefined' && !/Processor/i.test(out.name)){
     const CONF=[['E','6'],['E','8'],['E','F'],['E','B'],['0','O'],['1','I'],['5','S'],['8','B'],['6','G'],['2','Z'],['X','K']];
@@ -1765,17 +1800,21 @@ async function handleImage(file){
     let best=null; const tries=[];
     for(const kk of [3,4,2]){
       const cv=preprocess(img,kk); const r=await OCR_WORKER.recognize(cv); const pf=parseShotText(r.data.text);
-      const sc=nameScore(pf); tries.push({cv,sc});
+      const sc=nameScore(pf); tries.push({cv,sc,data:r.data});
       if(!best || sc<best.sc) best={data:r.data,f:pf,sc,cv,k:kk};
       if(sc===0) break;
       st.textContent='② 글자 인식 중… (다시 확인)';
     }
     if(best.sc>=3){
       st.textContent='② 상품명 줄만 다시 인식 중…';
-      const jobs=[]; tries.slice().sort((a,b)=>a.sc-b.sc).slice(0,2).forEach(tr=>{ (tr.cv._bands||[]).slice(0,2).forEach(b=>jobs.push([tr.cv,b])); });
+      const jobs=[]; tries.slice().sort((a,b)=>a.sc-b.sc).slice(0,2).forEach(tr=>{ (tr.cv._bands||[]).slice(0,2).forEach(b=>jobs.push([tr.cv,b]));
+        // 강조 띠가 없는 목록 화면: 모델 번호·Xeon·Processor가 보이는 줄만 잘라 한 줄 모드로 다시 인식
+        const ls=((tr.data&&tr.data.lines)||[]).filter(l=>l.bbox && /Xeon|Core|Ultra|Processor|Cache|GHz|\b\d{4,5}[A-Z]{0,2}\b/i.test(l.text) && !/MP\d{8}/.test(l.text) && (l.text||'').trim().length>12)
+          .sort((a,b)=>(b.bbox.x1-b.bbox.x0)-(a.bbox.x1-a.bbox.x0)).slice(0,2);
+        ls.forEach(l=>jobs.push([tr.cv,{x0:l.bbox.x0,x1:l.bbox.x1,y0:Math.max(0,l.bbox.y0-6),y1:Math.min(tr.cv.height,l.bbox.y1+6)}])); });
       for(const [bcv,b] of jobs){
         try{ const t=await readBand(bcv,b); if(!t) continue; const f2=parseShotText('상품명 :\n'+t); const sc2=nameScore(f2);
-          if(f2.name && sc2<best.sc){ best.f=Object.assign({},best.f,{name:f2.name,fix:f2.fix,nameOk:f2.nameOk}); best.sc=sc2; } }catch(e){}
+          if(f2.name && sc2<best.sc){ best.f=Object.assign({},best.f,{name:f2.name,fix:f2.fix,nameOk:f2.nameOk,maker:f2.maker||best.f.maker}); best.sc=sc2; } }catch(e){}
       }
     }
     const data=best.data, f=best.f;
@@ -1883,7 +1922,7 @@ function presetBtn(p,i){ const [t]=p; const parts=t.split(' · '); const kind=pa
   return `<button type="button" class="btn btn-ghost" onclick="fill(${i})"><span class="k ${k[0]}">${k[1]}</span>${esc(text)}</button>`; }
 /* 지원 카테고리 (헤더 칩 → 패널). 카테고리가 늘면 CATS에 한 줄 추가 */
 const CATS=[
-  {n:'CPU',m:'사양 DB 생성',s:()=>`Intel 데스크톱 ${Object.keys(DB).length}개 모델 · 서버 Xeon 6 ${Object.keys(SERVER_DB).length}개 모델`},
+  {n:'CPU',m:'사양 DB 생성',s:()=>`Intel 데스크톱 ${Object.keys(DB).length}개 모델 · 서버 Xeon ${Object.keys(SERVER_DB).length}개 모델 (Xeon 6 · Gold 5320)`},
   {n:'RAM',m:'상품명 기반 생성',s:()=>'데스크탑·서버용 메모리 (DDR 세대·속도·용량 등 상품명에 있는 값만 사용)'},
   {n:'모니터',m:'정렬 · 점검',s:()=>'기존 중요요약을 표준 순서로 정렬 (값을 새로 만들지 않음)'},
   {n:'완제품 PC',m:'시리즈 규칙',s:()=>{const a=Object.entries(SET_HW).filter(([k,v])=>v.cat==='pc');return `HP ${a.map(([k,v])=>v.series+' ('+k+')').join(', ')} · ${a.length}종`;}},
