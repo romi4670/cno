@@ -1446,6 +1446,55 @@ function genMakerNbKeywords(S,P,model,line,mk,color){
   { const m=(S.os||'').match(/Win\s?(\d+)\s*(Pro|Home|P|H)?\b/i); if(m) kw.push('Win'+m[1]+(/^p/i.test(m[2]||'')?'Pro':/^h/i.test(m[2]||'')?'Home':'')); }   // OS 키워드: Win11Pro
   return dedupe(kw);
 }
+/* 캡처 인식 상품명 보정: 한글·영문 혼동이 많아 상품명이 깨져 읽히므로, 등록된 상품명(NB_KNOWN_NAMES)과 모델 코드로 대조해 바로잡는다.
+   - 모델 코드 토큰이 등록 모델과 글자 2개 이내로 비슷하고, 전체 문자열이 가장 가까운 상품명 하나를 선택 (동점이면 보정하지 않음)
+   - 옵션 표기(+, 교체, 추가, 설치)가 있으면 앞부분(제조사·라인명·모델)만 등록 상품명으로 바꾸고 옵션은 인식값을 유지 */
+const NB_KNOWN_NAMES=[
+  '[LG전자] 울트라PC 듀얼업 15UD50T-GX5JK (기본 제품)',
+  '[LG전자] 울트라PC 듀얼업 15U55T-GP56ML (Ultra5 225U/16GB/256GB/Win11 Pro) [기본 제품]',
+  '[LG전자] 2026 그램북 15UD50U-GX5JK (기본 제품)',
+  '[LG전자] 그램15 15ZD90RU-GX54K (기본 제품)',
+  '[LG전자] 그램15 15Z90T-GA5NK (기본 제품)',
+  '[LG전자] LG 그램 15Z90S-GP56ML (기본 제품)',
+  '[LG전자] 2024 그램16 16Z90SU-GRF6K (기본 제품)',
+  '[LG전자] 2024 그램17 17ZD90SU-GXF6K (기본 제품)',
+  '[LG전자] 2025 그램17 17ZD90T-GX56K (기본 제품)',
+  '[LG전자] 그램 프로16 16ZD90TR-EX7BK 코어 울트라7-255H (32GB/512GB/RTX5050/FD) (기본 제품)',
+  '[LG전자] 2026 그램 프로360 16T95TP-KA5WK (기본 제품)',
+  '[삼성전자] [MD PICK] 갤럭시북4 NT750XGR-A51AG 그레이 (16GB/256GB/FD) [기본 제품]',
+  '[삼성전자] 갤럭시북4 NT750XGR-A38AS 실버 (8GB/256GB/FD) (기본 제품)',
+  '[삼성전자] 갤럭시북4 NT750XGR-A51A 그레이',
+  '[삼성전자] 갤럭시북4 프로 NT940XGQ-A51AG 문스톤 그레이',
+  '[삼성전자] 갤럭시북5 NT750XHW-A51AG 그레이 (Ultra5 225U /16GB /256GB /Non OS) [기본 제품]',
+  '[삼성전자] 갤럭시북5 NT750XHW-A51AS 실버 (Ultra5 225U /16GB /256GB /Non OS) [기본 제품]',
+  '[삼성전자] 갤럭시북5 NT750XHW-A71AG 그레이 (Ultra7-255U/16GB/256GB/FD) [기본 제품]',
+  '[삼성전자] 갤럭시북5 NT750XHW-A71AR (Ultra7-255U/32GB/256GB/FD) (기본제품)',
+  '[삼성전자] 갤럭시북5 NT750XHW-A72AR (Ultra7-255U/32GB/512GB/FD) (기본제품)',
+  '[삼성전자] 갤럭시북5 NT751XHD-KR515 그레이 (Ultra5-225U/16GB/512GB/WIN11 PRO)',
+  '[HP] 비전 15-FD2136TU 울트라5-225U (16GB/512GB/FD) [기본 제품]',
+  '[HP] HyperX 오멘 15-gb0140AX (R7-8745HX/16GB/512GB/RTX5060/FD) [기본모델]'
+];
+function lev(a,b){ const m=a.length,n=b.length; if(!m) return n; if(!n) return m; let p=Array.from({length:n+1},(_,j)=>j); for(let i=1;i<=m;i++){ const c=[i]; for(let j=1;j<=n;j++) c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1)); p=c; } return p[n]; }
+const NB_MODEL_TOKEN=/(?:NT\d{3}[A-Z]{2,4}|\d{2}[A-Z]{1,2}\d{2,3}[A-Z]{0,2}|\d{2})-[A-Za-z0-9]{3,8}/;
+function repairOcrNbName(raw){
+  const r=(raw||'').replace(/\s+/g,' ').trim(); if(!r) return null;
+  const toks=r.split(/\s+/).filter(t=>/-/.test(t)&&t.length>=7&&t.length<=18);
+  if(!toks.length) return null;
+  const cands=[];
+  NB_KNOWN_NAMES.forEach(nm=>{ const mm=nm.match(NB_MODEL_TOKEN); if(!mm) return; const model=mm[0];
+    toks.forEach(t=>{ const d=lev(t.toUpperCase(),model.toUpperCase()); if(d<=2) cands.push({nm,model,d,tok:t,full:lev(r.toUpperCase(),nm.toUpperCase())}); }); });
+  if(!cands.length) return null;
+  cands.sort((a,b)=>a.d-b.d||a.full-b.full);
+  const best=cands[0], same=cands.filter(c=>c.d===best.d&&c.full===best.full&&c.model!==best.model);
+  if(same.length) return null;   // 동점이면 추측하지 않음
+  const opt=/[+]|교체|추가|설치/.test(r);
+  let name=best.nm;
+  if(opt){   // 옵션 표기(+·교체·설치)가 있는 상품은 같은 모델의 다른 판매 상품명일 수 있어 앞부분·옵션은 인식값을 유지하고 모델 코드만 바로잡음
+    const i=r.indexOf(best.tok); name=r.slice(0,i)+best.model+r.slice(i+best.tok.length);
+  }
+  if(name===r) return null;
+  return {name,from:r,model:best.model,d:best.d,opt};
+}
 /* 노트북 사양 DB: 담당자가 확인·등록한 중요요약(모델 코드 기준). 모델 코드가 같으면 상품명·입력에 없는 항목을 여기서 채움.
    새 모델은 확인된 중요요약을 한 줄 추가. 값은 등록본/제조사 공식 사양을 담당자가 확인한 것만 넣는다. */
 const NB_SPEC_DB={
@@ -1561,7 +1610,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261106-2240'};
+const BUILD={ver:'v2.1',id:'20261106-2310'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
@@ -1904,6 +1953,8 @@ function fallbackCopy(t,ok){ const ta=document.createElement('textarea'); ta.val
 function run(){
   COPY={};
   const I={maker:v('maker'),brand:v('brand'),name:v('name'),sub:v('sub'),kw:v('kw'),spec:v('spec'),as:v('as'),cooler:v('cooler'),ocr:OCR_NOTE};
+  let OCR_REPAIR=null;   // 캡처가 깨져 읽은 상품명을 등록 상품명·모델 코드로 보정 (상품명 칸도 같이 고침)
+  if(OCR_NOTE && I.name){ OCR_REPAIR=repairOcrNbName(I.name); if(OCR_REPAIR){ I.name=OCR_REPAIR.name; $('name').value=I.name; } }
   const G=$('gen'), K=$('checksBox'), M=$('mode'), S=$('src');
   if(!I.name){ G.innerHTML=`<div class="gen-row"><div class="gen-v na">캡처를 넣거나 상품명을 입력하면 상품명 · 브랜드 · 부가제목 · 키워드 · 중요요약설명이 여기에 채워집니다.</div></div>`; K.innerHTML=''; M.textContent=''; S.innerHTML=''; setRunState('idle','입력 대기'); return; }
   if(OCR_NOTE && oddCount(I.name)>=2){
@@ -1915,6 +1966,7 @@ function run(){
   const symChk=nameSymbolCheck(I.name,cat);
   let g='', src='';
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
+  if(OCR_REPAIR) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 등록 상품명으로 교체',d:`${C(OCR_REPAIR.from)} → ${C(OCR_REPAIR.name)} — 모델 코드 ${C(OCR_REPAIR.model)}${OCR_REPAIR.d?` (인식값과 ${OCR_REPAIR.d}글자 차이)`:''}가 등록 상품명과 일치해 한글·영문 인식 오류를 바로잡았습니다${OCR_REPAIR.opt?'. 옵션 표기(+·교체·설치)는 인식값을 그대로 두었으니 원본과 대조하세요':''}. 원본 캡처와 반드시 대조하세요`});
   if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:OCR_FIX.bySpec?`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 모델 번호가 깨져 읽혀서, 상품명 괄호의 사양(코어·스레드·캐시·클럭)이 서버 사양 DB의 이 모델과 정확히 같을 때만 제안했습니다. 원본 캡처와 반드시 대조하세요`:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
   if(OCR_NOTE && OCR_SPEC && I.spec) extra.push({sev:'ask',t:'캡처에서 읽은 중요요약 사용',d:'작은 글씨라 숫자·모델명이 틀리게 읽힐 수 있습니다(예: 225U). 원본과 반드시 대조하거나, 구관리자의 중요요약을 복사해 "기존 정보와 비교"에 붙여 넣으세요.'});
   if(OCR_NOTE && OCR_NOTES.length) extra.push({sev:'ask',t:'캡처 인식 보정 · 상품명 표기',d:OCR_NOTES.map(n=>`${C(n.from)} → ${C(n.to)}`).join(' ')+' — '+(OCR_NOTES.some(n=>n.drop)?'깨져 읽힌 괄호는 제외했습니다(모델 번호와 판매구성만 사용). ':'')+(OCR_NOTES.some(n=>n.model)?'모델 번호의 글자 혼동(예: E↔6)을 사양 DB의 모델로 고쳤습니다 — DB에 같은 형태의 모델이 하나뿐일 때만 제안합니다. ':'')+(OCR_NOTES.some(n=>!n.drop&&!n.model)?'규격(PC 번호)과 짝이 맞는 표기로 고쳤습니다. ':'')+'원본 캡처와 반드시 대조하세요'});
