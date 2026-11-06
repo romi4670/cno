@@ -1533,7 +1533,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261106-1851'};
+const BUILD={ver:'v2.1',id:'20261106-2200'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
@@ -2003,8 +2003,17 @@ $('name').addEventListener('input',()=>{ OCR_NOTES=[]; OCR_NOTE=false; OCR_FIX=n
 let OCR_WORKER=null, OCR_MODEL='';
 // 고정밀 한글·영문 모델(4.0.0_best_int)을 먼저 시도하고, 받지 못하면 기본 모델로 자동 전환 (용량도 작아 첫 실행이 빠름)
 async function makeWorker(){
-  try{ const w=await Tesseract.createWorker('kor+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0_best_int'}); OCR_MODEL='고정밀'; return w; }
-  catch(e){ OCR_MODEL='기본'; return await Tesseract.createWorker('kor+eng'); }
+  // 고정밀 데이터가 15초 안에 안 내려오면 기본 모델로 전환하고, 내려받는 동안 진행률을 보여 줌
+  const logger=m=>{ const st=$('ocrStatus'); if(st && m && /loading|download/i.test(m.status||'') && typeof m.progress==='number') st.textContent=`① 인식 데이터 내려받는 중 ${Math.round(m.progress*100)}% (${OCR_MODEL||'고정밀'} 모델)`; };
+  const pending=Tesseract.createWorker('kor+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0_best_int',logger});
+  try{
+    const w=await Promise.race([pending,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),15000))]);
+    OCR_MODEL='고정밀'; return w;
+  }catch(e){
+    pending.then(w=>w.terminate()).catch(()=>{});   // 늦게 도착한 고정밀 워커는 정리
+    OCR_MODEL='기본'; const st=$('ocrStatus'); if(st) st.textContent='① 고정밀 데이터가 느려 기본 모델로 전환 중…';
+    return await Tesseract.createWorker('kor+eng',1,{logger});
+  }
 }
 function loadTesseract(){
   if(window.Tesseract) return Promise.resolve();
