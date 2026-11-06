@@ -559,7 +559,7 @@ function inferCodename(maker, brand, model){
   if(DB[m]) return {cn:GEN[DB[m].gen].cn,conf:'confirmed',note:'CNO 사양 DB 기준'};
 
   // AMD EPYC
-  if(/EPYC/i.test(b+m)){
+  if(/EPYC|에픽/i.test(b+m)){
     const num=m.match(/\d{4}/);
     if(num){ const last=num[0].slice(-1);
       if(last==='5') return {cn:'튜린',conf:'medium',note:'끝자리 5 → 9005 시리즈 추론. AMD 공식 재확인 권장'};
@@ -777,13 +777,22 @@ function serverBrandOf(model){
   if(/^6\d{3}[PE]$/.test(m)) return 'Intel® Xeon® 6';
   if(/^W\d?-\d{4}/.test(m)) return 'Intel® Xeon® W';
   if(/^E-\d{4}/.test(m)) return 'Intel® Xeon® E';
-  return null; // Scalable(Gold·Platinum 등)은 세대별 등급 규칙이 달라 현재값 유지
+  { const s=m.match(/^(\d)\d{3}[A-Z]{0,3}\+?$/);   // Xeon Scalable 등급: 모델 첫 자리 (8 Platinum · 6/5 Gold · 4 Silver · 3 Bronze). 9xxx(Max 등)는 규칙 밖
+    if(s) return {'8':'Intel® Xeon® Platinum','6':'Intel® Xeon® Gold','5':'Intel® Xeon® Gold','4':'Intel® Xeon® Silver','3':'Intel® Xeon® Bronze'}[s[1]]||null; }
+  return null;
 }
-function genServerKeywords(model, cn, oldKw){
+const XEON_CN_EN={'그래니트 래피즈':'Granite Rapids','시에라 포레스트':'Sierra Forest','사파이어 래피즈':'Sapphire Rapids','에메랄드 래피즈':'Emerald Rapids','아이스레이크-SP':'Ice Lake-SP','캐스케이드레이크':'Cascade Lake','스카이레이크-SP':'Skylake-SP'};
+const XEON_TIER={'Intel® Xeon® Platinum':['플래티넘','Platinum'],'Intel® Xeon® Gold':['골드','Gold'],'Intel® Xeon® Silver':['실버','Silver'],'Intel® Xeon® Bronze':['브론즈','Bronze']};
+const XEON_GEN={'스카이레이크-SP':'1세대','캐스케이드레이크':'2세대','아이스레이크-SP':'3세대','사파이어 래피즈':'4세대','에메랄드 래피즈':'5세대'};
+function genServerKeywords(model, cn, oldKw, o){
+  o=o||{};
   const out=[], push=s=>{ if(s && !out.some(x=>x.toLowerCase()===s.toLowerCase())) out.push(s); };
   const removed=[], foreign=[], cnConflict=[], M=model.toUpperCase();
   const old=(oldKw||'').split(',').map(x=>x.trim()).filter(Boolean);
   push(model);
+  // 사양 DB 미등록 서버 CPU: 담당자 서버 키워드 규칙을 상품명·코드네임·등급 매핑으로 조합 (PK 오더코드·소켓은 확인된 값이 없어 제외)
+  if(cn && /^6\d{3}[PE]$/.test(M)){ push('Xeon '+model); push('Xeon'+model); push(XEON_CN_EN[cn]); push(cn.replace(/\s/g,'')); if(/\s/.test(cn)) push(cn); if(o.cores) push(o.cores+'코어'); ['서버CPU','인텔','제온','제온6'].forEach(push); }
+  else if(cn && XEON_GEN[cn] && /^\d{4}[A-Z]{0,3}\+?$/.test(M)){ push('Xeon'+model); push('제온'+model); ['인텔','intel','제온','Xeon'].forEach(push); const t=XEON_TIER[o.brand]; if(t){ push(t[0]); push(t[1]); } push(XEON_GEN[cn]); push(cn.replace(/\s/g,'')); if(/\s/.test(cn)) push(cn); }
   old.forEach(k=>{
     const kl=k.toLowerCase().replace(/\s/g,'');
     if(BANNED.some(b=>kl===b.toLowerCase())){ removed.push(k); return; }
@@ -846,7 +855,7 @@ function processCpu(I){
   const isServer = P.isServerFmt || !!sent || /XEON|제온/i.test(I.brand+' '+I.name) || /^[WE]\d?-\d{4}/.test(P.model);
   const isAmd = !isServer && !ent && /라이젠|RYZEN/i.test(I.brand+' '+I.name);
   const amd = isAmd ? amdInfo(P.model) : null;
-  const inf=inferCodename(I.maker,(isServer&&!/XEON|제온/i.test(I.brand))?(I.brand+' Xeon'):((isAmd&&!/라이젠|RYZEN/i.test(I.brand))?'AMD 라이젠':I.brand),P.model);
+  const inf=inferCodename(I.maker,(isServer&&!/XEON|제온/i.test(I.brand))?(I.brand+' Xeon'):((isAmd&&!/라이젠|RYZEN/i.test(I.brand))?'AMD 라이젠':(/EPYC|에픽/i.test(I.name)&&!/EPYC|에픽/i.test(I.brand))?(I.brand+' EPYC'):I.brand),P.model);
   const ask=(t,d)=>checks.push({sev:'ask',t,d});
 
   // (a) 제조사 ↔ 브랜드
@@ -945,9 +954,13 @@ function processCpu(I){
   }
 
   // (g) 브랜드 대조
+  // 인텔 코어 티어: 상품명·브랜드에 있으면 그대로, 없으면 12~14세대 모델 번호 규칙(세 번째 자리 1·3→i3, 4·5·6→i5, 7→i7, 9→i9)으로 조합
+  const intelTxt=((I.brand+' '+I.name).match(/(?:^|[\s(\-\[])(?:코어\s*)?i([3579])(?![0-9A-Za-z])/i)||[])[1]||null;
+  const intelInf=(!isServer&&!isAmd&&!ent&&/^1[2-4]\d{3}[A-Z]{0,3}$/.test(P.model))?({'1':'3','3':'3','4':'5','5':'5','6':'5','7':'7','9':'9'}[P.model[2]]||null):null;
+  const intelTier=intelTxt||intelInf;
   const amdT = isAmd?((I.brand+' '+I.name).match(/(?:라이젠|Ryzen)[®™\s]*([3579])(?!\d)/i)||[])[1]||null:null;
   const amdTier = isAmd?(amdT||(amd&&amd.tierGuess)||null):null;
-  const brandNew = isAmd?(amdTier?`AMD Ryzen™ ${amdTier}`:null):(sent&&sent.brand)?sent.brand:ent?brandOf(ent,P.model):(isServer?serverBrandOf(P.model):brandOf(null,((I.name+' '+I.brand).match(/i[3579]/i)||[''])[0]));
+  const brandNew = isAmd?(amdTier?`AMD Ryzen™ ${amdTier}`:null):(sent&&sent.brand)?sent.brand:ent?brandOf(ent,P.model):(isServer?serverBrandOf(P.model):brandOf(null,intelTier?'i'+intelTier:''));
   if(brandNew && I.brand && I.brand.replace(/\s/g,'')!==brandNew.replace(/\s/g,'')) checks.push({sev:'warn',t:'브랜드 표기 변경 제안',d:`${C(I.brand)} → ${C(brandNew)}`});
 
   // ---- 생성 ----
@@ -1012,9 +1025,10 @@ function processCpu(I){
       if(cl && cooler.state!=='unk' && (cl==='미포함')!==(cooler.state==='out')){ bad++; checks.push({sev:'err',t:'중요요약 쿨러 항목 충돌',d:`현재값 ${C('쿨러:'+cl)} ↔ 근거(${esc(cooler.why)}) ${C(cooler.text)}`}); }
       if(!bad) checks.push({sev:'ok',t:'중요요약 현재값 대조 일치',d:'아키텍처·소켓·쿨러·코어/스레드 비율에서 충돌 없음 (시리즈 규칙 기준 · 모델별 사양은 AMD 공식 대조 전)'});
     }
-  }else if(!isServer && /^1[2-4]\d{3}[A-Z]{0,3}$/.test(P.model) && GEN[P.model.slice(0,2)] && /(?:^|[\s(-])(?:코어\s*)?i([3579])(?![0-9A-Za-z])/i.test(I.brand+' '+I.name)){
+  }else if(!isServer && /^1[2-4]\d{3}[A-Z]{0,3}$/.test(P.model) && GEN[P.model.slice(0,2)] && intelTier){
     // DB에 없는 데스크톱 코어 CPU: 키워드는 세대·티어만으로 만드는 규칙 패턴이라 규칙으로 생성 (사양 값이 필요한 중요요약은 DB가 있어야 함)
-    const tier='i'+(((I.brand+' '+I.name).match(/(?:^|[\s(-])(?:코어\s*)?i([3579])(?![0-9A-Za-z])/i))||[])[1];
+    const tier='i'+intelTier;
+    if(!intelTxt) checks.push({sev:'ok',t:'코어 티어 · 모델 번호 규칙',d:`상품명에 티어 표기가 없어 모델 번호 ${C(P.model)}로 ${C('코어 '+tier)}를 조합했습니다 (세 번째 자리 1·3→i3, 4·5·6→i5, 7→i7, 9→i9)`});
     const gnum=P.model.slice(0,2), nameGen=(I.name.match(/(\d{2})세대/)||[])[1];
     if(nameGen && nameGen!==gnum) checks.push({sev:'ask',t:'세대 표기 불일치',d:`상품명 ${C(nameGen+'세대')} ↔ 모델 번호 ${C(P.model)}(${gnum}세대) — 키워드는 모델 번호 기준으로 만들었습니다`});
     const pe={model:P.model,disp:P.model,gen:gnum,tier,kwx:[]};
@@ -1027,13 +1041,27 @@ function processCpu(I){
     if(kwInfo.removed.length) checks.push({sev:'warn',t:'키워드 제외 (포괄어·유통어)',d:kwInfo.removed.map(C).join(' ')});
     if(kwInfo.foreign.length) checks.push({sev:I.ocr?'ask':'err',t:I.ocr?'키워드에 다른 모델 번호 · 인식 오류 확인':'키워드에 다른 모델 혼입',d:kwInfo.foreign.map(C).join(' ')});
     checks.push({sev:'ask',t:'키워드·브랜드는 규칙으로 생성 · 사양 DB 미등록',d:`${C(P.model)}는 사양 DB에 없어 키워드(모델명·티어·세대·코드네임·소켓)와 브랜드만 세대·티어 규칙으로 만들었습니다. 중요요약은 모델별 사양 값이 필요해서 만들지 않았습니다. 하단 '사양 데이터 관리'에서 Intel 공식 사양을 붙여넣어 등록하세요`});
-  }else if(isServer && /^(\d{4}[A-Z]{0,3}|[WE]\d?-\d{4}[A-Z+]*)$/i.test(P.model)){
-    kwInfo=genServerKeywords(P.model, inf&&inf.cn, I.kw);
+  }else if(isServer && /^(\d{4}[A-Z]{0,3}\+?|[WE]\d?-\d{4}[A-Z+]*)$/i.test(P.model)){
+    kwInfo=genServerKeywords(P.model, inf&&inf.cn, I.kw, {cores:((specG&&specG.text.match(SERVER_SPEC_RE))||[])[1], brand:brandNew});
     gen.kw=kwInfo.kw;
     if(kwInfo.removed.length) checks.push({sev:'warn',t:'키워드 제외 (포괄어·유통어)',d:kwInfo.removed.map(C).join(' ')});
     if(kwInfo.foreign.length) checks.push({sev:I.ocr?'ask':'err',t:I.ocr?'키워드에 다른 모델 번호 · 인식 오류 확인':'키워드에 다른 모델 혼입',d:kwInfo.foreign.map(C).join(' ')+(I.ocr?' — 캡처의 작은 글씨는 잘못 읽힐 수 있음. 원본과 대조':' — 다른 상품 키워드 복사 의심')});
     if(kwInfo.cnConflict.length) checks.push({sev:'ask',t:'키워드 코드네임 불일치',d:`${kwInfo.cnConflict.map(C).join(' ')} ↔ 판정 ${C(inf.cn)} — 제안 키워드에서 제외`});
     if(kwInfo.added.length) checks.push({sev:'warn',t:'키워드 제안 · 추가 항목',d:`${kwInfo.added.map(C).join(' ')} — 모델명 우선, 코드네임은 붙여 쓴 형태와 띄어 쓴 형태 모두 포함. 사양 DB 없이 모델명·코드네임 규칙만 사용했으므로 확인 후 반영`});
+  }
+  if(!sent && isServer && specG && /^\d{4}[A-Z]{0,3}\+?$/.test(P.model) && inf && inf.cn){
+    // 서버 사양 DB 미등록: 상품명 괄호(코어·스레드·캐시·클럭)와 코드네임 규칙으로 확인되는 항목만 같은 순서로 조립
+    const sm2=specG.text.match(SERVER_SPEC_RE);
+    if(sm2){
+      const f=n=>(n%1===0?n.toFixed(1):String(n)), gm={'스카이레이크-SP':1,'캐스케이드레이크':2,'아이스레이크-SP':3,'사파이어 래피즈':4,'에메랄드 래피즈':5};
+      let lead=null;
+      if(/^6\d{3}[PE]$/.test(P.model)) lead=`Xeon 6 ${P.model.slice(0,2)}00${P.model.slice(-1)} 시리즈(${inf.cn})`;
+      else if(gm[inf.cn]) lead=`${gm[inf.cn]}세대 Xeon Scalable(${inf.cn})`;
+      if(lead){
+        gen.sum=[lead,`${sm2[1]}코어`,`${sm2[2]}스레드`,`기본 클럭:${f(parseFloat(sm2[4]))}GHz`,`L3 캐시:${parseFloat(sm2[3])}MB`,`쿨러:${cooler.state==='unk'?'[확인 필요]':cooler.text}`].join('|');
+        checks.push({sev:'ask',t:'서버 중요요약 일부 항목 보류 · 사양 DB 미등록',d:`상품명 괄호와 코드네임 규칙으로 확인되는 ${C('코어·스레드·기본 클럭·L3 캐시')}만 넣었습니다. 소켓·공정·최대 클럭·TDP·메모리·PCIe 등은 이 모델의 확인된 사양이 없어 보류했으니 Intel 공식 사양 확인 후 추가하세요`});
+      }
+    }
   }
   if(sent){
     gen.sum=genServerSummary(sent,cooler);
@@ -1058,7 +1086,9 @@ const REFRESH=[60,75,90,100,120,144,165,180,200,240,280,300,360];
 const MON_JUNK=[/게이밍\s*모니터/,/(?<!커브드\s)모니터$/,/후속\s*모델/,/신제품/,/초특가|특가|무료배송|당일발송/];
 function processMonitor(I,F){
   F=F||{};
-  const checks=[]; const N=I.name.replace(/\s+/g,' ').trim(); const tokens=N.split(' ');
+  const checks=[]; let N=I.name.replace(/\s+/g,' ').trim(); let brandTag='';
+  { const bm=N.match(/^\[([^\]]{1,12})\]\s*/); if(bm){ brandTag=bm[1]; N=N.slice(bm[0].length); } }   // 앞의 [브랜드]는 모델명·키워드로 쓰지 않고 제조사로만 사용
+  const tokens=N.split(' ');
   let model=tokens[0]||'';
   if(!/\d/.test(model) && tokens[1] && /[A-Z]/i.test(tokens[1]) && /\d/.test(tokens[1]) && !/인치|Hz/i.test(tokens[1])) model=model+' '+tokens[1];
   // 제품군 단어(에센셜·모니터 등)가 앞에 오면 영문+숫자로 된 모델 코드를 모델명으로 삼고, 앞 단어는 상품명에서 빼고 키워드로 옮김
@@ -1090,7 +1120,7 @@ function processMonitor(I,F){
   if(fill.length) checks.push({sev:'ask',t:'표준안에 중요요약 값 반영',d:`상품명에 없는 ${fill.join('·')}을(를) 현재 중요요약설명에서 가져와 표준안에 채움 — 값 확인 후 사용`});
   // 키워드 제안 (모니터 키워드 규칙은 확정 전: 모델 → 시리즈 → 모델 앞부분 → 제조사모니터 → 제품군모니터 → 형태모니터 → 크기모니터 → 패널 → 해상도 → 주사율)
   const uniq=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
-  const pre=model.replace(/[A-Z]{4,6}$/,''); const mk=(I.maker||'').replace(/(전자|코리아|주식회사|\(주\))$/,'').trim();
+  const pre=model.replace(/[A-Z]{4,6}$/,''); const mk=(I.maker||brandTag||'').replace(/(전자|코리아|주식회사|\(주\))$/,'').trim();
   const kwList=uniq([model.replace(/\s+/g,' '), ...seriesTok, (pre!==model&&pre.length>=6)?pre:null, mk||null, ...lead.filter(w=>w!=='모니터').map(w=>/^(게이밍|화이트|사무용)$/.test(w)?w+'모니터':w), FO==='커브드'?'커브드':null, S?S+'인치':null, PA, RE, (refresh||hzBare||F.hz)?((refresh||hzBare||F.hz)+'Hz'):null]);
   const parts=[model, S?S+'인치':'[크기?]']; if(FO) parts.push(FO); parts.push(PA||'[패널?]', RE||'[해상도?]');
   const rf=RF; if(rf) parts.push(rf+'Hz'); feats.forEach(f=>parts.push(f));
@@ -1755,7 +1785,7 @@ function run(){
     g+=genRow('brand','브랜드',r.gen.brand,r.isServer?'서버 CPU 브랜드는 현재값 유지 (Intel® Xeon® Gold / Xeon® 6 / Xeon® W / Xeon® E 등)':'티어 판별 불가 — 모델명 확인',r.gen.brand?(r.isServer?['ask','규칙 기반 · 확인 요청']:['ok','규칙']):['unk','현재값 유지']);
     g+=genRow('sub','부가제목',r.gen.sub,'서버 CPU 부가제목은 공급 조건(Tray·리드타임·취소 규정)이라 현재값 유지',r.gen.sub?(/확인\]/.test(r.gen.sub)?['ask','쿨러 확인 필요']:['ok','규칙']):['unk','현재값 유지']);
     g+=genRow('kw','키워드',r.gen.kw,'사양 DB 미등록 모델 — 키워드를 추정 생성하지 않음',r.gen.kw?((r.isServer||r.pseudoKw)?['ask',r.pseudoKw?'규칙 기반 · 사양 DB 미등록':'규칙 기반 · 확인 요청']:['ok','규칙']):['unk','DB 미등록']);
-    g+=genRow('sum','중요요약설명',r.gen.sum,'사양 DB 미등록 모델 — 사양값을 만들지 않음 (Truth Protocol). Intel 공식 사양 확인 후 DB에 추가하면 생성됩니다.'.replace(/.*/,r.isAmd?'AMD 라이젠 중요요약 서식이 확정되지 않아 만들지 않음 — 현재 등록값을 그대로 사용 (아키텍처·소켓·쿨러만 대조)':'$&'),r.ent?sumTag(r.ent,r.gen.sum):(r.sent?sumTag(r.sent,r.gen.sum):(r.isAmd?['unk','현재값 유지 · AMD 서식 미확정']:['unk','DB 미등록'])));
+    g+=genRow('sum','중요요약설명',r.gen.sum,'사양 DB 미등록 모델 — 사양값을 만들지 않음 (Truth Protocol). Intel 공식 사양 확인 후 DB에 추가하면 생성됩니다.'.replace(/.*/,r.isAmd?'AMD 라이젠 중요요약 서식이 확정되지 않아 만들지 않음 — 현재 등록값을 그대로 사용 (아키텍처·소켓·쿨러만 대조)':'$&'),r.ent?sumTag(r.ent,r.gen.sum):(r.sent?sumTag(r.sent,r.gen.sum):(r.isAmd?['unk','현재값 유지 · AMD 서식 미확정']:r.gen.sum?['ask','일부 항목 보류 · 사양 DB 미등록']:['unk','DB 미등록'])));
     if(r.ent){
       const e=r.ent, gg=GEN[e.gen];
       src+=srcLine('desktop_cpu',e,e.disp);
