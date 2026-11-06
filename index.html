@@ -1610,7 +1610,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261107-0040'};
+const BUILD={ver:'v2.1',id:'20261107-0100'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
@@ -1773,7 +1773,7 @@ function processRam(I){
   const R=parseRamName(nm); if(lead) R.brand=lead; else if((I.brand||'').trim() && !/[^A-Za-z0-9가-힣\s®™]/.test(I.brand)) { R.brand=I.brand.trim(); R.brandFromField=true; } else if(!R.brand && (I.maker||'').trim()) { R.brand=I.maker.trim(); R.brandFromMaker=true; }
   R.maker=(I.maker||'').trim(); R.kwText=((I.kw||'')+' '+(I.spec||'')+' '+nm).toUpperCase();
   if(!R.ok){ checks.push({sev:'unk',t:'메모리 규격을 읽지 못함',d:'상품명에서 DDR 세대와 속도를 찾지 못해 키워드·중요요약을 만들지 않음'}); return {checks,gen,R}; }
-  if(R.brand){ gen.brand=R.brand; if(lead) checks.push({sev:'ask',t:'브랜드 분리',d:`상품명 앞의 ${C(lead)}를 브랜드로 옮기고 상품명에서 뺐습니다. 제조사는 ${C(R.maker||'-')}입니다`}); else if(R.brandFromField) checks.push({sev:'ok',t:'브랜드 현재값 사용',d:C(R.brand)}); else if(R.brandFromMaker) checks.push({sev:'ask',t:'브랜드 = 제조사',d:'상품명에 브랜드가 따로 없어 제조사명을 브랜드로 제안했습니다'}); }
+  if(R.brand){ gen.brand=R.brand; if(lead) checks.push({sev:'ask',t:'브랜드 분리',d:`상품명 앞의 ${C(lead)}를 브랜드로 옮기고 상품명에서 뺐습니다. 제조사는 ${C(R.maker||'-')}입니다`}); else if(R.brandFromField) checks.push({sev:'ok',t:'브랜드 현재값 사용',d:C(R.brand)}); else if(R.brandFromMaker) checks.push(I.makerTag?{sev:'ok',t:'브랜드 = 제조사',d:`${C(I.makerTag)} — 상품명 앞 제조사 태그를 제조사 칸으로 옮기고 브랜드로 사용했습니다`}:{sev:'ask',t:'브랜드 = 제조사',d:'상품명에 브랜드가 따로 없어 제조사명을 브랜드로 제안했습니다'}); }
   else checks.push({sev:'unk',t:'브랜드 확인불가',d:'상품명 앞의 [브랜드] 표기가 없어 브랜드를 만들지 않음'});
   // 속도 ↔ PC 번호 일관성
   const pcN=(nm.match(/PC\d-(\d{5})/i)||nm.match(/-\s*(\d{5})\s*$/)||[])[1], spN=(nm.match(/DDR\d-(\d{4})\b/i)||nm.match(/\b(\d{4})\s*MHz/i)||nm.match(/-\s*(\d{4})\s*$/)||[])[1];
@@ -1956,9 +1956,9 @@ function run(){
   let OCR_REPAIR=null;   // 캡처가 깨져 읽은 상품명을 등록 상품명·모델 코드로 보정 (상품명 칸도 같이 고침)
   if(OCR_NOTE && I.name){ OCR_REPAIR=repairOcrNbName(I.name); if(OCR_REPAIR){ I.name=OCR_REPAIR.name; $('name').value=I.name; } }
   // 앞의 [LG전자]·[삼성전자]·[HP]는 신관리자에서 제조사로 선택하는 값이라 상품명에서 빼고 제조사 칸으로 옮김 (CPU·노트북·완제품 PC)
-  if(I.name){ const c0=detectCategory(I);
-    if(c0==='cpu'||c0==='nb'||c0==='pc'){ const m=I.name.match(/^\s*\[([^\]]{1,12})\]\s*/);
-      if(m && !/PICK|추천|특가|이벤트|단독|신상|할인|NEW|BEST|HOT/i.test(m[1])){ I.name=I.name.slice(m[0].length); if(!I.maker){ I.maker=m[1].trim(); $('maker').value=I.maker; } if(OCR_NOTE) $('name').value=I.name; } } }
+  // 모든 상품군(CPU·노트북·완제품 PC·RAM·모니터) 공통. RAM 브랜드는 이 제조사 값(=기존 [브랜드] 태그와 같은 값)에서 읽음
+  if(I.name){ const m=I.name.match(/^\s*\[([^\]]{1,12})\]\s*/);
+    if(m && !/PICK|추천|특가|이벤트|단독|신상|할인|NEW|BEST|HOT/i.test(m[1])){ I.name=I.name.slice(m[0].length); I.makerTag=m[1].trim(); if(!I.maker){ I.maker=I.makerTag; $('maker').value=I.maker; } if(OCR_NOTE) $('name').value=I.name; } }
   const G=$('gen'), K=$('checksBox'), M=$('mode'), S=$('src');
   if(!I.name){ G.innerHTML=`<div class="gen-row"><div class="gen-v na">캡처를 넣거나 상품명을 입력하면 상품명 · 브랜드 · 부가제목 · 키워드 · 중요요약설명이 여기에 채워집니다.</div></div>`; K.innerHTML=''; M.textContent=''; S.innerHTML=''; setRunState('idle','입력 대기'); return; }
   if(OCR_NOTE && oddCount(I.name)>=2){
