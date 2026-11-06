@@ -869,7 +869,14 @@ function processCpu(I){
   if(isServer){
     gen.sub = null; // 서버 부가제목은 공급 조건(Tray·리드타임·취소 규정) → 현재값 유지
   }else{
-    gen.sub = [cooler.state==='unk'?'※ 쿨러 [포함/미포함 확인]':`※ 쿨러 ${cooler.state==='in'?'포함':'미포함'}`, I.as?`※ A/S ${I.as}`:null].filter(Boolean).join(' | ');
+    // 기존 부가제목의 문구는 보존하고 선택한 A/S만 덧붙임 (쿨러 판정이 안 서면 기존 쿨러 문구를 유지)
+    const segs=(I.sub||'').split('|').map(x=>x.trim()).filter(Boolean);
+    const exCool=segs.find(x=>/^※\s*쿨러\s*(포함|미포함)/.test(x)), exAs=segs.find(x=>/^※\s*A\/S/.test(x));
+    const head=segs.filter(x=>/^\[/.test(x)), other=segs.filter(x=>!/^\[/.test(x)&&x!==exCool&&x!==exAs&&!/^※\s*(쿨러|A\/S)/.test(x));
+    const coolSeg=cooler.state!=='unk'?`※ 쿨러 ${cooler.state==='in'?'포함':'미포함'}`:(exCool||'※ 쿨러 [포함/미포함 확인]');
+    const asSeg=I.as?`※ A/S ${I.as}`:(exAs||null);
+    gen.sub=[...head,coolSeg,asSeg,...other].filter(Boolean).join(' | ');
+    if(cooler.state==='unk' && exCool) checks.push({sev:'ask',t:'쿨러 문구 현재값 유지',d:`상품명만으로 쿨러 여부를 판정할 수 없어 부가제목의 ${C(exCool)}를 그대로 두었습니다. 판매구성과 맞는지 확인하세요`});
   }
   if(!I.as && !isServer) checks.push({sev:'unk',t:'A/S 기간 미입력',d:'확인된 A/S 기간이 없으면 부가제목에서 생략 (추정 금지)'});
   // 키워드 · 요약
