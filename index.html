@@ -1446,6 +1446,26 @@ function genMakerNbKeywords(S,P,model,line,mk,color){
   { const m=(S.os||'').match(/Win\s?(\d+)\s*(Pro|Home|P|H)?\b/i); if(m) kw.push('Win'+m[1]+(/^p/i.test(m[2]||'')?'Pro':/^h/i.test(m[2]||'')?'Home':'')); }   // OS 키워드: Win11Pro
   return dedupe(kw);
 }
+/* 노트북 사양 DB: 담당자가 확인·등록한 중요요약(모델 코드 기준). 모델 코드가 같으면 상품명·입력에 없는 항목을 여기서 채움.
+   새 모델은 확인된 중요요약을 한 줄 추가. 값은 등록본/제조사 공식 사양을 담당자가 확인한 것만 넣는다. */
+const NB_SPEC_DB={
+  '15UD50T-GX5JK':{line:'울트라PC',src:'담당자 확인 중요요약(LG 공식 사양 기준)',sum:'노트북|운영체제(OS):미포함(프리도스)|화면정보|39.6cm(15.6인치)|1920x1080(FHD)|안티글레어|CPU|인텔|코어i5-13세대|i5-1334U (1.3GHz)|데카(10)코어|램|DDR4|램 용량:8GB|램 슬롯:2개|램 교체:가능|그래픽|내장그래픽|UHD Graphics|저장장치|M.2(NVMe)|256GB|저장 슬롯:2개|입력장치|숫자 키패드|웹캠|웹캠 가림막|파워|배터리:51Wh|전원:USB-PD|주요제원|무게:1.7kg|색상:티탄 실버|용도:사무/인강용'},
+  '15ZD90RU-GX54K':{line:'그램15',src:'등록본',sum:'노트북|운영체제(OS):미포함(프리도스)|용도:사무/인강용,휴대용|화면정보|39.6cm(15.6인치)|1920x1080(FHD)|350nit|CPU|인텔|코어i5-13세대|i5-1334U (1.3GHz)|10코어(2P+8E)|램|LPDDR4x(온보드)|램 용량:16GB|4266MHz|램 교체:불가능|그래픽|내장그래픽|Iris Xe|저장장치|M.2(NVMe)|256GB|저장 슬롯:2개|네트워크|무선랜:802.11ax(Wi-Fi 6E)|영상입출력|HDMI|DP Alt Mode|웹캠(HD)|단자|썬더볼트4:2개(USB-C겸용)|USB-A:2개|MicroSD카드|파워|배터리:80Wh|어댑터:65W|전원:USB-PD|주요제원|두께:17.4mm|무게:1.14kg|색상:화이트'},
+  'NT750XGR-A51AG':{line:'갤럭시북4',src:'등록본',sum:'노트북|운영체제(OS):미포함(프리도스)|화면정보|39.6cm(15.6인치)|1920x1080(FHD)|CPU|인텔|코어i5-13세대|i5-1335U (1.3GHz)|10코어(2P+8E)|램|LPDDR4x(온보드)|램 용량:16GB|램 교체:불가능|그래픽|내장그래픽|Iris Xe|저장장치|M.2(NVMe)|256GB|저장 슬롯:2개|네트워크|무선랜:802.11ax(Wi-Fi 6)|영상입출력|HDMI|웹캠|웹캠(HD)|단자|USB-C:2개|USB-A:2개|MicroSD카드|부가기능|TPM|입력장치|ㅗ형 방향키|숫자 키패드(3열)|파워|배터리:54Wh|어댑터:45W|전원:USB-PD|주요제원|두께:15.4mm|무게:1.55kg'},
+  'NT750XGR-A38AS':{line:'갤럭시북4',src:'등록본',sum:'노트북|운영체제(OS):미포함(프리도스)|화면정보|39.6cm(15.6인치)|1920x1080(FHD)|CPU|인텔|코어i3-13세대|i3-1315U (1.2GHz)|헥사코어(2P+4E)|램|LPDDR4x(온보드)|램 용량:8GB|램 교체:불가능|그래픽|내장그래픽|UHD Graphics|저장장치|M.2(NVMe)|256GB|저장 슬롯:2개|네트워크|무선랜:802.11ax(Wi-Fi 6)|영상입출력|HDMI|웹캠|웹캠(HD)|단자|USB-C:2개|USB-A:2개|MicroSD카드|부가기능|TPM|입력장치|ㅗ형 방향키|숫자 키패드(3열)|파워|배터리:54Wh|어댑터:45W|전원:USB-PD|주요제원|두께:15.4mm|무게:1.55kg|색상:실버'},
+  'NT940XGQ-A51AG':{line:'갤럭시북4 프로',src:'등록본',sum:'노트북|운영체제(OS):Win11P|화면정보|35.6cm(14인치)|2880x1800(WQXGA+)|400nit|주사율:120Hz|CPU|인텔|코어 울트라5|125H (4.5GHz)|14코어(4P+8E+2LE)|램|LPDDR5x(온보드)|램 용량:16GB|램 교체:불가능|그래픽|내장그래픽|Arc|저장장치|M.2(NVMe)|256GB|저장 슬롯:2개|네트워크|무선랜:802.11ax(Wi-Fi 6E)|영상입출력|HDMI 2.1|웹캠|단자|썬더볼트4:2개(USB-C겸용)|USB-A:1개|MicroSD카드|부가기능|지문인식(전원버튼)|TPM|고속충전|입력장치|키보드 라이트|ㅗ형 방향키|파워|배터리:63Wh|어댑터:65W|충전단자:타입C|주요제원|두께:11.6mm|무게:1.23kg|색상:그레이'}
+};
+function fillFromNbDb(S,P,checks,model){
+  const e=NB_SPEC_DB[(model||'').toUpperCase()]; if(!e) return null;
+  const D=parseNbSpec(e.sum), filled=[];
+  const empty=v=>v===null||v===undefined||v===false||v===''||(Array.isArray(v)&&!v.length);
+  Object.keys(D).forEach(k=>{ if(k==='std'||k==='others'||k==='hold'||k==='cpuModelId') return; if(empty(S[k])&&!empty(D[k])){ S[k]=D[k]; filled.push(k); } });
+  const id=x=>(x||'').replace(/\s*\(.*$/,'').toUpperCase(), n=x=>(x||'').replace(/\s/g,'').toUpperCase();
+  if(S.ram&&D.ram&&n(S.ram)!==n(D.ram)) checks.push({sev:'err',t:'램 용량 ↔ 사양 DB 불일치',d:`입력·상품명 ${C(S.ram)} ↔ 등록 사양 ${C(D.ram)} — 구성 옵션(램 교체)이 아니면 확인하세요`});
+  if(S.cpuModel&&D.cpuModel&&id(S.cpuModel)!==id(D.cpuModel)) checks.push({sev:'err',t:'CPU 모델 ↔ 사양 DB 불일치',d:`입력 ${C(S.cpuModel)} ↔ 등록 사양 ${C(D.cpuModel)}`});
+  checks.push({sev:'ok',t:'노트북 사양 DB 등록 모델',d:`${C(model)} — ${esc(e.src)}. 입력에 없던 항목 ${filled.length}종을 등록 사양에서 채웠습니다. 입력·상품명 값(예: 저장장치 교체 옵션)은 그대로 우선합니다`});
+  return e;
+}
 function processNbMaker(I,P,checks,gen,S,model,mk){
   const MK=NB_MAKERS[mk];
   const rest=I.name.replace(/\[[^\]]*\]/g,' ').replace(/\s+/g,' ').trim(), li=rest.indexOf(model);   // [MD PICK]·[기본 제품] 같은 태그 제외
@@ -1473,11 +1493,19 @@ function processNbMaker(I,P,checks,gen,S,model,mk){
   else if(P.ssd && !S.ssdCap) S.ssdCap=P.ssd.replace(/\s/g,'').toUpperCase();
   if(!S.os && P.os && /Non\s*OS|프리도스|FreeDOS/i.test(P.os)) S.os='미포함(프리도스)';
   if(!S.os && /\/FD\)|\bFD\)/.test(I.name)) S.os='미포함(프리도스)';   // 상품명 괄호의 FD = 프리도스
+  const dbHit=fillFromNbDb(S,P,checks,model);
+  if(dbHit && dbHit.line && line!==dbHit.line){   // 사양 DB 모델은 DB의 제품 라인명을 사용 (캡처 인식이 한글 라인명을 잘못 읽는 경우 대비)
+    checks.push({sev:'ask',t:'제품 라인명 · 사양 DB 값으로 대체',d:`${C(line||'(없음)')} → ${C(dbHit.line)} — 상품명에서 읽은 라인명이 사양 DB와 다릅니다${I.ocr?'. 캡처 인식 오류일 수 있으니 상품명 칸을 원본과 대조하세요':''}`});
+    line=dbHit.line;
+  }
+  if(I.ocr && line && mk!=='hp' && !/[가-힣]/.test(line)){   // 캡처 인식은 한글 라인명을 영문 글자로 잘못 읽기 쉬움 → 한글이 없는 라인명은 브랜드로 쓰지 않음
+    checks.push({sev:'ask',t:'캡처 인식 의심 · 제품 라인명',d:`${C(line)} — 한글이 없어 인식 오류로 보입니다. 브랜드·키워드의 라인명을 만들지 않았으니 상품명 칸을 원본과 대조해 고치세요`}); line=null;
+  }
   if(!S.color && color) S.color=color;
   if(line) S.others=S.others.filter(x=>!x.includes(line));   // 입력에 섞인 제품 라인명 토큰은 브랜드로 이미 사용
   gen.brand=line;
   checks.push({sev:'ask',t:`${MK.name} 노트북 · 브랜드는 제품 라인명 제안`,d:line?`${C(line)} — ${MK.name} 노트북 브랜드 표기 기준이 확정되지 않아 제품 라인명(그램은 ${C('그램17')}처럼 크기 포함)을 제안합니다. 기존 ${MK.name} 노트북 등록본과 맞춰 주세요`:'상품명에서 제품 라인명을 찾지 못해 브랜드를 만들지 않았습니다'});
-  if(extraPre.length && mk!=='hp') checks.push({sev:'ask',t:'상품명 확인 · 판매처 표현 가능성',d:`${C(extraPre.join(' '))} — ${MK.name} 공식 명칭인지 확인이 필요합니다. 노트북 상품명 규칙이 아직 없어 상품명은 그대로 두었습니다`});
+  if(extraPre.length && mk!=='hp' && !(dbHit&&dbHit.line)) checks.push({sev:'ask',t:'상품명 확인 · 판매처 표현 가능성',d:`${C(extraPre.join(' '))} — ${MK.name} 공식 명칭인지 확인이 필요합니다. 노트북 상품명 규칙이 아직 없어 상품명은 그대로 두었습니다`});
   gen.kw=genMakerNbKeywords(S,P,model,line,mk,color).join(',');
   if(color && mk==='samsung' && /A[A-Z]$/.test(model)) checks.push({sev:'ask',t:'모델명 끝 글자 확인',d:`${C(model)} / ${C(model.slice(0,-1))} — 끝 ${C(model.slice(-1))}는 색상 코드로 보이지만 확인할 수 없어 두 표기 모두 키워드에 넣었습니다`});
   if(S.purpose) checks.push({sev:'warn',t:'키워드 제외 · 포괄어',d:`${C(S.purpose)} 같은 용도어는 키워드에 넣지 않고 중요요약 ${C('용도')} 항목(운영체제 바로 뒤)에 둡니다`});
@@ -1533,7 +1561,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261106-2200'};
+const BUILD={ver:'v2.1',id:'20261106-2240'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
@@ -2001,19 +2029,13 @@ $('name').addEventListener('input',()=>{ OCR_NOTES=[]; OCR_NOTE=false; OCR_FIX=n
    - 인식 결과는 입력칸에 채우고 사람이 확인. 생성 필드는 모델 번호 기준으로 DB·규칙에서 만들어짐
    ========================================================= */
 let OCR_WORKER=null, OCR_MODEL='';
-// 고정밀 한글·영문 모델(4.0.0_best_int)을 먼저 시도하고, 받지 못하면 기본 모델로 자동 전환 (용량도 작아 첫 실행이 빠름)
+// 한글·영문 기본 모델로 인식 엔진 준비
 async function makeWorker(){
-  // 고정밀 데이터가 15초 안에 안 내려오면 기본 모델로 전환하고, 내려받는 동안 진행률을 보여 줌
+  // 내려받는 동안 진행률을 보여 줌
   const logger=m=>{ const st=$('ocrStatus'); if(st && m && /loading|download/i.test(m.status||'') && typeof m.progress==='number') st.textContent=`① 인식 데이터 내려받는 중 ${Math.round(m.progress*100)}% (${OCR_MODEL||'고정밀'} 모델)`; };
-  const pending=Tesseract.createWorker('kor+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0_best_int',logger});
-  try{
-    const w=await Promise.race([pending,new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),15000))]);
-    OCR_MODEL='고정밀'; return w;
-  }catch(e){
-    pending.then(w=>w.terminate()).catch(()=>{});   // 늦게 도착한 고정밀 워커는 정리
-    OCR_MODEL='기본'; const st=$('ocrStatus'); if(st) st.textContent='① 고정밀 데이터가 느려 기본 모델로 전환 중…';
-    return await Tesseract.createWorker('kor+eng',1,{logger});
-  }
+  // 고정밀 주소(4.0.0_best_int)는 더 이상 파일을 제공하지 않아(404) 시도할 때마다 지연만 생김 → 기본 모델만 사용
+  OCR_MODEL='기본';
+  return await Tesseract.createWorker('kor+eng',1,{logger});
 }
 function loadTesseract(){
   if(window.Tesseract) return Promise.resolve();
