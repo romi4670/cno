@@ -349,6 +349,10 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
 #gen.flash{animation:genFlash .7s ease-out}
 #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(12px);background:#1F2937;color:#fff;font-size:13px;font-weight:600;padding:9px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;z-index:50}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.ocr-crop{margin-top:8px}
+.ocr-crop .crop-l{font-size:12px;font-weight:700;color:var(--blue-ink);margin-bottom:4px}
+.ocr-crop canvas{display:block;max-width:100%;height:auto;border:1.5px solid var(--blue-line);border-radius:4px;background:#fff}
 </style>
 </head>
 <body>
@@ -383,6 +387,7 @@ input:focus,textarea:focus,select:focus{border-color:#0C58FB;box-shadow:0 0 0 3p
           </div>
           <div class="pick">저장해 둔 이미지 파일이면 <button type="button" id="pick" class="linkbtn">파일에서 선택</button></div>
           <div id="ocrStatus" class="ocr-st" role="status" aria-live="polite"></div>
+          <div id="ocrCrop" class="ocr-crop"></div>
         </div>
         <div class="way">
           <div class="way-lab"><span class="n">방법 2</span>상품명 입력 <span class="h">입력하면 바로 생성</span></div>
@@ -853,7 +858,8 @@ function processCpu(I){
     if(cnG.text!==cnG.canon) ask('코드네임 표기 확인',`${C(cnG.text)} → 정식 표기 ${C(cnG.canon)}`);
     if(inf.cn){
       if(canonCN(cnG.canon)===canonCN(inf.cn)) checks.push({sev:'ok',t:'코드네임 일치',d:`${C(cnG.canon)} — ${esc(inf.note)}`});
-      else ask('코드네임 사실 오류 의심',`상품명 ${C(cnG.text)} ↔ 판정 ${C(inf.cn)} · 근거: ${esc(inf.note)}`);
+      else{ const e0=DB[(P.model||'').toUpperCase()]; const gl=e0?GEN[e0.gen].label:null;
+        ask('코드네임 사실 오류',`상품명에 ${C('('+cnG.text+')')}라고 되어 있지만, ${gl?esc(gl)+'는 ':'판정은 '}${C(inf.cn)}입니다. 근거: ${esc(inf.note)}. ${e0?'중요요약과 키워드는 DB 값(코드네임 '+C(GEN[e0.gen].cn)+')으로 넣었습니다.':'이 모델은 사양 DB에 없어 중요요약·키워드는 만들지 않았습니다.'} 상품명은 담당자 확인 후 수정하세요.`); }
     }else checks.push({sev:'unk',t:'코드네임 확인불가',d:`${C(cnG.text)} — ${esc(inf.note)}`});
   }else if(!isServer){
     if(inf.cn) ask('코드네임 누락',`상품명에 코드네임 없음. 참고: ${C('('+inf.cn+')')}`);
@@ -890,6 +896,8 @@ function processCpu(I){
   // (d) 판매구성 — 형식은 인정, 내용만 확인
   const saleG=P.groups.filter(g=>g.kind==='sale').map(g=>g.text).join(' / ');
   if(saleG) checks.push({sev:'ok',t:'판매구성 표기 인정',d:`${C(saleG)} — 상품명 유지 (보존 모드)`});
+  { const e1=DB[(P.model||'').toUpperCase()]; const cm=(saleG||'').match(/\b(RM1|RS1|RH1)\b/i);
+    if(e1 && e1.k && cm) ask('쿨러 적정성 확인',`K 모델은 최대 터보 전력이 ${C(e1.mtp+'W')}입니다. 여기에 ${C(cm[1].toUpperCase()+' 쿨러')}를 묶은 구성이 이 전력을 감당할 수 있는지 확인이 필요합니다. (쿨러 사양은 상품명에 없어 CNO가 판정하지 않고 확인만 요청합니다)`); }
   P.groups.filter(g=>g.kind==='unknown').forEach(g=>checks.push({sev:'unk',t:'분류 불가 괄호',d:`${C('('+g.text+')')} — 코드네임/판매구성/사양 어디에도 해당하지 않음`}));
   if(/Processor/i.test(P.outside) && /정품|벌크|tray|box/i.test(saleG)) checks.push({sev:'warn',t:'서버 Tray/Box 위치',d:'서버 CPU의 Tray/Box 정보는 부가제목에 두는 규칙'});
 
@@ -1490,7 +1498,7 @@ function run(){
   const extra = OCR_NOTE ? [{sev:'ask',t:'캡처 인식값 사용',d:'상품명 입력칸의 인식 결과를 원본 캡처와 한 번 대조해 주세요. 모델 번호가 맞으면 나머지 필드는 DB·규칙으로 생성되어 인식 오류의 영향을 받지 않습니다.'}] : [];
   if(OCR_NOTE && OCR_FIX) extra.unshift({sev:'ask',t:'캡처 인식 보정 · 모델 번호',d:OCR_FIX.bySpec?`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 모델 번호가 깨져 읽혀서, 상품명 괄호의 사양(코어·스레드·캐시·클럭)이 서버 사양 DB의 이 모델과 정확히 같을 때만 제안했습니다. 원본 캡처와 반드시 대조하세요`:`${C(OCR_FIX.from)} → ${C(OCR_FIX.to)} — 인텔 서버 모델은 4자리+접미(P·E 등)라 끝자리를 ${C(OCR_FIX.to.slice(-1))}로 보정했습니다. 원본 캡처와 반드시 대조하고, E코어 모델이면 ${C(OCR_FIX.from.slice(0,4)+'E')}로 직접 수정하세요`});
   if(OCR_NOTE && OCR_SPEC && I.spec) extra.push({sev:'ask',t:'캡처에서 읽은 중요요약 사용',d:'작은 글씨라 숫자·모델명이 틀리게 읽힐 수 있습니다(예: 225U). 원본과 반드시 대조하거나, 구관리자의 중요요약을 복사해 "기존 정보와 비교"에 붙여 넣으세요.'});
-  if(OCR_NOTE && OCR_NOTES.length) extra.push({sev:'ask',t:'캡처 인식 보정 · 상품명 표기',d:OCR_NOTES.map(n=>`${C(n.from)} → ${C(n.to)}`).join(' ')+' — '+(OCR_NOTES.some(n=>n.drop)?'깨져 읽힌 괄호는 제외했습니다(모델 번호와 판매구성만 사용). ':'')+(OCR_NOTES.some(n=>!n.drop)?'규격(PC 번호)과 짝이 맞는 표기로 고쳤습니다. ':'')+'원본 캡처와 반드시 대조하세요'});
+  if(OCR_NOTE && OCR_NOTES.length) extra.push({sev:'ask',t:'캡처 인식 보정 · 상품명 표기',d:OCR_NOTES.map(n=>`${C(n.from)} → ${C(n.to)}`).join(' ')+' — '+(OCR_NOTES.some(n=>n.drop)?'깨져 읽힌 괄호는 제외했습니다(모델 번호와 판매구성만 사용). ':'')+(OCR_NOTES.some(n=>n.model)?'모델 번호의 글자 혼동(예: E↔6)을 사양 DB의 모델로 고쳤습니다 — DB에 같은 형태의 모델이 하나뿐일 때만 제안합니다. ':'')+(OCR_NOTES.some(n=>!n.drop&&!n.model)?'규격(PC 번호)과 짝이 맞는 표기로 고쳤습니다. ':'')+'원본 캡처와 반드시 대조하세요'});
   hygieneChecks(I).forEach(c=>extra.push(c));
   if(OCR_NOTE && OCR_KWDROP) extra.push({sev:'warn',t:'인식된 키워드 일부 제외',d:`읽을 수 없는 글자가 섞인 항목 ${OCR_KWDROP}개를 비교에서 제외했습니다. 원본 키워드를 "기존 정보와 비교"에 직접 붙여넣으면 정확히 점검됩니다.`});
   if(cat==='monitor'){
@@ -1592,7 +1600,12 @@ $('name').addEventListener('input',()=>{ OCR_NOTES=[]; OCR_NOTE=false; OCR_FIX=n
    - 이미지는 외부로 전송하지 않음. 최초 1회 인식 엔진·한국어 데이터를 내려받음
    - 인식 결과는 입력칸에 채우고 사람이 확인. 생성 필드는 모델 번호 기준으로 DB·규칙에서 만들어짐
    ========================================================= */
-let OCR_WORKER=null;
+let OCR_WORKER=null, OCR_MODEL='';
+// 고정밀 한글·영문 모델(4.0.0_best_int)을 먼저 시도하고, 받지 못하면 기본 모델로 자동 전환 (용량도 작아 첫 실행이 빠름)
+async function makeWorker(){
+  try{ const w=await Tesseract.createWorker('kor+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0_best_int'}); OCR_MODEL='고정밀'; return w; }
+  catch(e){ OCR_MODEL='기본'; return await Tesseract.createWorker('kor+eng'); }
+}
 function loadTesseract(){
   if(window.Tesseract) return Promise.resolve();
   return new Promise((res,rej)=>{ const sc=document.createElement('script');
@@ -1662,6 +1675,16 @@ function parseShotText(text){
   out.name=out.name.replace(/×/g,'X');
   // 메모리 이름: DDR 글자가 숫자로 깨진 경우(예: DDR4 → 0084)와 끝 괄호 보정 — 보정한 사실은 화면에 확인 요청으로 표시
   out.notes=[];
+  // 모델 번호 끝자리 혼동(E↔6·8·F, 0↔O 등): 사양 DB에서 글자 혼동만으로 달라지는 모델이 딱 하나일 때만 제안
+  if(typeof DB!=='undefined' && !/Processor/i.test(out.name)){
+    const CONF=[['E','6'],['E','8'],['E','F'],['E','B'],['0','O'],['1','I'],['5','S'],['8','B'],['6','G'],['2','Z'],['X','K']];
+    const near=(a,b)=>a.length===b.length && [...a].every((c,i)=>c===b[i]||CONF.some(([x,y])=>(c===x&&b[i]===y)||(c===y&&b[i]===x)));
+    out.name=out.name.replace(/\b(\d{4,5}[A-Z0-9]{1,3})\b/g,(m0,tok)=>{
+      const T=tok.toUpperCase(); if(DB[T]||!/^\d{4,5}[A-Z0-9]+$/.test(T)) return m0;
+      const hit=Object.keys(DB).filter(k=>near(T,k)&&k!==T);
+      if(hit.length===1){ out.notes.push({from:tok,to:hit[0],model:true}); return hit[0]; }
+      return m0; });
+  }
   { const m1=out.name.match(/^1([3579])-(?=[가-힣])/); if(m1){ out.notes.push({from:'1'+m1[1]+'-',to:'i'+m1[1]+'-'}); out.name=out.name.replace(/^1[3579]-/,'i'+m1[1]+'-'); } }
   // CPU 상품명: 괄호 안 코드네임이 깨져 읽힌 경우(세로선·한글 아닌 문자 뒤섞임)는 제외 — 모델 번호와 판매구성만 사용
   if(/\b\d{4,5}[A-Z]{0,2}\b/.test(out.name) && !/Processor|DDR|PC\d-\d{5}/i.test(out.name)){
@@ -1672,6 +1695,8 @@ function parseShotText(text){
   }
   { const pm=out.name.match(/PC([2345])-\d{5}/);
     if(pm){
+      { const cp=out.name.match(/(^|\s)(1|2|4|8|16|32|64|128|256)(G|GB|6|68|9|8)(?=\s+PC\d-)/);
+        if(cp && !/^(G|GB)$/.test(cp[3])){ out.notes.push({from:cp[2]+cp[3],to:cp[2]+'G'}); out.name=out.name.replace(cp[0],cp[1]+cp[2]+'G'); } }
       let t0=out.name.match(/(^|\s)([0OoDdB8RrIl1]{3}\d)(?=\s)/);
       if(t0 && t0[2].slice(3)!==pm[1]) t0=null;
       if(t0 && t0[2]!=='DDR'+pm[1]){ out.notes.push({from:t0[2],to:'DDR'+pm[1]}); out.name=out.name.replace(t0[2],'DDR'+pm[1]); }
@@ -1733,7 +1758,7 @@ async function handleImage(file){
   st.className='ocr-st busy'; st.textContent='① 인식 엔진 준비 (최초 1회 수 초 소요)'; setRunState('busy','처리 중 · 캡처 인식');
   try{
     await loadTesseract();
-    if(!OCR_WORKER){ OCR_WORKER=await Tesseract.createWorker('kor+eng'); }
+    if(!OCR_WORKER){ OCR_WORKER=await makeWorker(); }
     st.textContent='② 글자 인식 중…';
     const img=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=url; });
     // 상품명이 깨져 읽히면 배율을 바꿔 다시 인식 (3배 → 4배 → 2배), 그래도 깨지면 강조된 줄만 잘라 한 줄 모드로 인식
@@ -1741,7 +1766,7 @@ async function handleImage(file){
     for(const kk of [3,4,2]){
       const cv=preprocess(img,kk); const r=await OCR_WORKER.recognize(cv); const pf=parseShotText(r.data.text);
       const sc=nameScore(pf); tries.push({cv,sc});
-      if(!best || sc<best.sc) best={data:r.data,f:pf,sc,cv};
+      if(!best || sc<best.sc) best={data:r.data,f:pf,sc,cv,k:kk};
       if(sc===0) break;
       st.textContent='② 글자 인식 중… (다시 확인)';
     }
@@ -1754,17 +1779,35 @@ async function handleImage(file){
       }
     }
     const data=best.data, f=best.f;
+    let cropOk=false; try{ cropOk=showNameCrop(img,data,best.k||3,f.name); }catch(e){}
     if(!f.name){ throw new Error('상품명을 찾지 못했습니다. 상품명이 보이도록 다시 캡처하거나 직접 입력해 주세요.'); }
     $('catSel').value=''; $('name').value=f.name; $('maker').value=f.maker; $('brand').value=f.brand; $('sub').value=f.sub; $('kw').value=f.kw; $('spec').value=f.spec||'';
     OCR_NOTES=f.notes||[]; OCR_NOTE=true; OCR_FIX=f.fix||null; OCR_KWDROP=f.kwDropped||0; OCR_SPEC=!!f.spec;
     if(oddCount(f.name)>=2){ st.className='ocr-st bad'; st.textContent='⚠ 상품명을 제대로 읽지 못했습니다. 상품명 칸을 원본대로 고쳐 주세요.'; }
-    else{ st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (신뢰도 ${Math.round(data.confidence)}%) — 상품명 칸을 원본과 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`; }
+    else{ st.className='ocr-st'; st.innerHTML=`✓ 인식 완료 (${OCR_MODEL?OCR_MODEL+' 모델 · ':''}신뢰도 ${Math.round(data.confidence)}%) — 상품명 칸을 원본과 대조해 주세요. 인식값 전체는 "현재 등록값 대조"에서 확인·수정할 수 있습니다.`; }
     dz.innerHTML=`<div class="drop-t">다른 캡처를 끌어다 놓거나 <b>Ctrl+V</b></div><img src="${url}" alt="입력 캡처"><input type="file" id="file" accept="image/*" hidden>`;
     bindFile(); run();
   }catch(e){
     st.className='ocr-st bad'; st.textContent='인식 실패: '+e.message; setRunState('err','캡처 인식 실패');
     dz.innerHTML=`<div class="drop-t">캡처를 다시 끌어다 놓거나 <b>Ctrl+V</b></div><div class="drop-s">또는 상품명을 직접 입력하세요</div><input type="file" id="file" accept="image/*" hidden>`; bindFile();
   }
+}
+// 원본 캡처에서 상품명 줄을 잘라 보여줌: 읽은 값과 눈으로 바로 대조할 수 있도록
+function showNameCrop(img,data,k,name){
+  const box=$('ocrCrop'); if(!box) return false; box.innerHTML='';
+  const lines=(data&&data.lines)||[]; if(!lines.length||!name) return false;
+  const norm=t=>(t||'').toLowerCase().replace(/[^a-z0-9가-힣]/g,'');
+  const toks=(name.match(/[A-Za-z0-9][A-Za-z0-9\-]{3,}/g)||[]).map(norm).filter(Boolean);
+  let best=null,bs=0;
+  lines.forEach(l=>{ const t=norm(l.text); let sc=0; toks.forEach(x=>{ if(t.includes(x)) sc+=x.length; }); if(sc>bs){ bs=sc; best=l; } });
+  if(!best){ return false; }
+  const b=best.bbox, pad=6, sx=Math.max(0,Math.floor(b.x0/k)-pad), sy=Math.max(0,Math.floor(b.y0/k)-pad), sw=Math.min(img.naturalWidth-sx,Math.ceil((b.x1-b.x0)/k)+pad*2), sh=Math.min(img.naturalHeight-sy,Math.ceil((b.y1-b.y0)/k)+pad*2);
+  if(sw<20||sh<6) return false;
+  const sc=Math.min(2.4,Math.max(1,900/sw)), cv=document.createElement('canvas'); cv.width=Math.round(sw*sc); cv.height=Math.round(sh*sc);
+  const cx=cv.getContext('2d'); cx.imageSmoothingQuality='high'; cx.drawImage(img,sx,sy,sw,sh,0,0,cv.width,cv.height);
+  cv.setAttribute('role','img'); cv.setAttribute('aria-label','원본 캡처의 상품명 줄');
+  const lab=document.createElement('div'); lab.className='crop-l'; lab.textContent='원본 캡처의 상품명 줄 — 아래 상품명 칸과 같은지 확인하세요';
+  box.appendChild(lab); box.appendChild(cv); return true;
 }
 function bindFile(){ const fi=$('file'); if(fi) fi.onchange=()=>{ if(fi.files[0]) handleImage(fi.files[0]); }; }
 (function initDrop(){
