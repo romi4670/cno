@@ -1189,7 +1189,7 @@ function memReg(R){ return MEM_REG.find(e=>e.nb===!!R.notebook && e.brand===R.br
 function parseRamName(name){
   const N=(name||'').replace(/\s+/g,' ').trim(); const o={brand:null,type:null,speed:null,pc:null,cl:null,cap:null,count:null,server:false,ecc:false,reg:false,lrdimm:false,desktop:false,notebook:false,part:null,ok:false};
   const bm=N.match(/^\[([^\]]{1,20})\]/); o.brand=bm?bm[1]:null;
-  const tm=N.match(/DDR\s?([2345])/i); o.type=tm?'DDR'+tm[1]:null;
+  const tm=N.match(/DDR\s?([2345])/i)||N.match(/PC([2345])-\d{5}/i); o.type=tm?'DDR'+tm[1]:null;
   const sp=N.match(/DDR\d-(\d{4})\b/i)||N.match(/\b(\d{4})\s*MHz/i)||N.match(/-\s*(\d{4})\s*$/);
   const pc=N.match(/PC\d-(\d{5})/i)||N.match(/-\s*(\d{5})\s*$/);
   if(sp) o.speed=+sp[1]; if(pc) o.pc=+pc[1];
@@ -1238,12 +1238,12 @@ function processRam(I){
   let nm=(I.name||'').replace(/\s+/g,' ').trim(); let lead=null;
   { const b0=(nm.match(/^\[[^\]]{1,20}\]\s*/)||[''])[0], rest=nm.slice(b0.length);
     const lm=rest.match(/^(.+?)\s+(?=노트북|데스크탑|데스크톱|서버용|DDR\s?\d)/);
-    if(lm && lm[1].length<=12 && !/\s|DDR|\d{3,}/i.test(lm[1])){ lead=lm[1]; nm=(b0+rest.slice(lm[0].length)).trim(); } }
+    if(lm && lm[1].length<=12 && !/\s|DDR|\d{3,}/i.test(lm[1]) && !/^(노트북|데스크탑|데스크톱|서버용|서버)$/.test(lm[1])){ lead=lm[1]; nm=(b0+rest.slice(lm[0].length)).trim(); } }
   gen.name=nm;
-  const R=parseRamName(nm); if(lead) R.brand=lead; else if(!R.brand && (I.maker||'').trim()) { R.brand=I.maker.trim(); R.brandFromMaker=true; }
+  const R=parseRamName(nm); if(lead) R.brand=lead; else if((I.brand||'').trim() && !/[^A-Za-z0-9가-힣\s®™]/.test(I.brand)) { R.brand=I.brand.trim(); R.brandFromField=true; } else if(!R.brand && (I.maker||'').trim()) { R.brand=I.maker.trim(); R.brandFromMaker=true; }
   R.maker=(I.maker||'').trim();
   if(!R.ok){ checks.push({sev:'unk',t:'메모리 규격을 읽지 못함',d:'상품명에서 DDR 세대와 속도를 찾지 못해 키워드·중요요약을 만들지 않음'}); return {checks,gen,R}; }
-  if(R.brand){ gen.brand=R.brand; if(lead) checks.push({sev:'ask',t:'브랜드 분리',d:`상품명 앞의 ${C(lead)}를 브랜드로 옮기고 상품명에서 뺐습니다. 제조사는 ${C(R.maker||'-')}입니다`}); else if(R.brandFromMaker) checks.push({sev:'ask',t:'브랜드 = 제조사',d:'상품명에 브랜드가 따로 없어 제조사명을 브랜드로 제안했습니다'}); }
+  if(R.brand){ gen.brand=R.brand; if(lead) checks.push({sev:'ask',t:'브랜드 분리',d:`상품명 앞의 ${C(lead)}를 브랜드로 옮기고 상품명에서 뺐습니다. 제조사는 ${C(R.maker||'-')}입니다`}); else if(R.brandFromField) checks.push({sev:'ok',t:'브랜드 현재값 사용',d:C(R.brand)}); else if(R.brandFromMaker) checks.push({sev:'ask',t:'브랜드 = 제조사',d:'상품명에 브랜드가 따로 없어 제조사명을 브랜드로 제안했습니다'}); }
   else checks.push({sev:'unk',t:'브랜드 확인불가',d:'상품명 앞의 [브랜드] 표기가 없어 브랜드를 만들지 않음'});
   // 속도 ↔ PC 번호 일관성
   const pcN=(nm.match(/PC\d-(\d{5})/i)||nm.match(/-\s*(\d{5})\s*$/)||[])[1], spN=(nm.match(/DDR\d-(\d{4})\b/i)||nm.match(/\b(\d{4})\s*MHz/i)||nm.match(/-\s*(\d{4})\s*$/)||[])[1];
@@ -1375,7 +1375,7 @@ function detectCategory(I){
   // 상품명·브랜드·제조사만으로 판별 (중요요약 값의 UHD 730 같은 CPU 내장그래픽 표기에 속지 않도록 spec 제외)
   // 완제품 PC: 상품명 괄호에 'CPU/GPU/RAM/SSD/OS' 구성, 노트북: 시리즈명·모델 코드
   if(/\(([^()]*\/){2,}[^()]*(?:\)|$)/.test(I.name) && /RTX|GTX|\bRX\s?\d{3,4}/i.test(I.name) && !/Processor/i.test(I.name)) return 'pc';
-  if(/DDR\s?[2345]/i.test(I.name) && /\d+\s*G(?:B)?\b/i.test(I.name) && (/PC[2345]-\d{5}/i.test(I.name)||/메모리/.test(I.name)||/-\s*\d{4,5}\s*$/.test(I.name)) && !/Processor|RTX|GTX|라이젠|코어\s*(?:i\d|울트라)|\bUltra\b|\bCore\b|\bi[3579]-/i.test(I.name)) return 'ram';
+  if((/DDR\s?[2345]/i.test(I.name)||/PC[2345]-\d{5}/i.test(I.name)) && /\d+\s*G(?:B)?\b/i.test(I.name) && (/PC[2345]-\d{5}/i.test(I.name)||/메모리/.test(I.name)||/-\s*\d{4,5}\s*$/.test(I.name)) && !/Processor|RTX|GTX|라이젠|코어\s*(?:i\d|울트라)|\bUltra\b|\bCore\b|\bi[3579]-/i.test(I.name)) return 'ram';
   if(/빅터스|VICTUS|옴니북|파빌리온|노트북/i.test(I.name) || /(?:^|[\s\]])\d{2}-[A-Za-z]{2}\d{3,4}[A-Za-z]{0,3}\b/.test(I.name)) return 'nb';
   if(/DDR\s?[2345]/i.test(I.name) && /\d+\s*GB/i.test(I.name) && !/Processor/i.test(I.name)) return 'ram';
   const t=I.brand+' '+I.name+' '+I.maker;
@@ -1594,7 +1594,8 @@ function parseShotText(text){
   out.notes=[];
   { const pm=out.name.match(/PC([2345])-\d{5}/);
     if(pm){
-      const t0=out.name.match(/(^|\s)([0OD]{2}[8R]\d)(?=\s)/);
+      let t0=out.name.match(/(^|\s)([0OoDdB8RrIl1]{3}\d)(?=\s)/);
+      if(t0 && t0[2].slice(3)!==pm[1]) t0=null;
       if(t0 && t0[2]!=='DDR'+pm[1]){ out.notes.push({from:t0[2],to:'DDR'+pm[1]}); out.name=out.name.replace(t0[2],'DDR'+pm[1]); }
       const t1=out.name.match(/\(([A-Z]{2,3})\)(?=\s*-\s*\d{4}\s*$)/);
       if(t1){ out.notes.push({from:'('+t1[1]+')',to:'(정품)'}); out.name=out.name.replace(t1[0],'(정품)'); }
