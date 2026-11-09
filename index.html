@@ -927,6 +927,13 @@ function processCpu(I){
     if(/쿨러\s*미포함/.test(P.outside)) cooler={state:'out',text:'미포함',why:'상품명에 쿨러미포함 명시'};
     else if(/쿨러\s*포함/.test(P.outside)) cooler={state:'in',text:'포함',why:'상품명에 쿨러포함 명시'};
   }
+  // 인텔 데스크톱 CPU를 모델명만 넣은 경우(판매구성·부가제목·옵션 모두 없음): 컴퓨터코리아 기본값 쿨러 미포함 · A/S 3년 적용 후 확인 요청
+  let defAs=null, defCool=false;
+  if(!isServer && !isAmd && (ent||/^1[2-4]\d{3}[A-Z]{0,3}$/.test(P.model)) && !saleG && !I.sub && !I.cooler){
+    if(cooler.state==='unk'){ cooler={state:'out',text:'미포함',why:'기본값(모델명만 입력)'}; defCool=true; }
+    if(!I.as){ defAs='3년'; }
+    if(defCool||defAs) ask('기본값 적용 확인',`판매구성·부가제목이 없어 ${C('※ 쿨러 미포함')}${defAs?' · '+C('※ A/S 3년'):''} 기본값을 넣었습니다. 정품박스·병행수입 등이면 쿨러/A/S 옵션을 직접 선택하세요`);
+  }
   if(I.sub){
     const subIn=/쿨러\s*포함/.test(I.sub), subOut=/쿨러\s*미포함/.test(I.sub);
     if(cooler.state==='in'&&subOut) checks.push({sev:'err',t:'상품명↔부가제목 쿨러 충돌',d:`판매구성 ${C(saleG)} 에 쿨러가 있는데 부가제목은 ${C('쿨러 미포함')}`});
@@ -975,7 +982,7 @@ function processCpu(I){
     const exCool=segs.find(x=>/^※\s*쿨러\s*(포함|미포함)/.test(x)), exAs=segs.find(x=>/^※\s*A\/S/.test(x));
     const head=segs.filter(x=>/^\[/.test(x)), other=segs.filter(x=>!/^\[/.test(x)&&x!==exCool&&x!==exAs&&!/^※\s*(쿨러|A\/S)/.test(x));
     const coolSeg=cooler.state!=='unk'?`※ 쿨러 ${cooler.state==='in'?'포함':'미포함'}`:(exCool||'※ 쿨러 [포함/미포함 확인]');
-    const asSeg=I.as?`※ A/S ${I.as}`:(exAs||null);
+    const asSeg=(I.as||defAs)?`※ A/S ${I.as||defAs}`:(exAs||null);
     const mpSeg=(isAmd&&/멀티\s*팩/.test(saleG))?'※ 멀티팩 제품':null;   // AMD: 멀티팩은 부가제목에 '※ 멀티팩 제품'
     const mpOld=mpSeg?other.filter(x=>/멀티\s*팩/.test(x)):[];
     const rest=mpSeg?other.filter(x=>!/멀티\s*팩/.test(x)):other;
@@ -983,7 +990,7 @@ function processCpu(I){
     gen.sub=[...head,coolSeg,mpSeg,asSeg,...rest].filter(Boolean).join(' | ');
     if(cooler.state==='unk' && exCool) checks.push({sev:'ask',t:'쿨러 문구 현재값 유지',d:`상품명만으로 쿨러 여부를 판정할 수 없어 부가제목의 ${C(exCool)}를 그대로 두었습니다. 판매구성과 맞는지 확인하세요`});
   }
-  if(!I.as && !isServer && !/※\s*A\/S/.test(I.sub||'')) checks.push({sev:'unk',t:'A/S 기간 미입력',d:'확인된 A/S 기간이 없으면 부가제목에서 생략 (추정 금지)'});
+  if(!I.as && !defAs && !isServer && !/※\s*A\/S/.test(I.sub||'')) checks.push({sev:'unk',t:'A/S 기간 미입력',d:'확인된 A/S 기간이 없으면 부가제목에서 생략 (추정 금지)'});
   // 키워드 · 요약
   let kwInfo=null, pseudoKw=false;
   if(ent){
@@ -1610,7 +1617,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261109-1324'};
+const BUILD={ver:'v2.1',id:'20261109-1500'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},
