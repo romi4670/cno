@@ -1090,7 +1090,7 @@ function processMonitor(I,F){
   { const bm=N.match(/^\[([^\]]{1,12})\]\s*/); if(bm){ brandTag=bm[1]; N=N.slice(bm[0].length); } }   // 앞의 [브랜드]는 모델명·키워드로 쓰지 않고 제조사로만 사용
   const tokens=N.split(' ');
   let model=tokens[0]||'';
-  if(!/\d/.test(model) && tokens[1] && /[A-Z]/i.test(tokens[1]) && /\d/.test(tokens[1]) && !/인치|Hz/i.test(tokens[1])) model=model+' '+tokens[1];
+  if(!/\d/.test(model) && !/^모니터$/.test(model) && tokens[1] && /[A-Z]/i.test(tokens[1]) && /\d/.test(tokens[1]) && !/인치|Hz/i.test(tokens[1])) model=model+' '+tokens[1];
   // 제품군 단어(에센셜·모니터 등)가 앞에 오면 영문+숫자로 된 모델 코드를 모델명으로 삼고, 앞 단어는 상품명에서 빼고 키워드로 옮김
   let lead=[]; const looksModel=m=>/[A-Za-z].*\d|\d.*[A-Za-z]/.test(m) && !/^(OMEN|삼성|LG|AOC|주연|알파스캔)$/i.test(m);
   if(!looksModel(model)){ const ci=tokens.findIndex(t=>/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9\-]{6,}$/.test(t)); if(ci>0){ model=tokens[ci]; lead=tokens.slice(0,ci).filter(t=>!/[A-Za-z0-9]/.test(t)); } }
@@ -1121,7 +1121,7 @@ function processMonitor(I,F){
   // 키워드 제안 (모니터 키워드 규칙은 확정 전: 모델 → 시리즈 → 모델 앞부분 → 제조사모니터 → 제품군모니터 → 형태모니터 → 크기모니터 → 패널 → 해상도 → 주사율)
   const uniq=a=>a.filter(Boolean).filter((x,i,b)=>b.findIndex(y=>y.toLowerCase()===x.toLowerCase())===i);
   const pre=model.replace(/[A-Z]{4,6}$/,''); const mk=(I.maker||brandTag||'').replace(/(전자|코리아|주식회사|\(주\))$/,'').trim();
-  const kwList=uniq([model.replace(/\s+/g,' '), ...seriesTok, (pre!==model&&pre.length>=6)?pre:null, mk||null, ...lead.filter(w=>w!=='모니터').map(w=>/^(게이밍|화이트|사무용)$/.test(w)?w+'모니터':w), FO==='커브드'?'커브드':null, S?S+'인치':null, PA, RE, (refresh||hzBare||F.hz)?((refresh||hzBare||F.hz)+'Hz'):null]);
+  const kwList=uniq([model.replace(/\s+/g,' '), ...seriesTok, (pre!==model&&pre.length>=6)?pre:(/\d[A-Z]$/.test(model)&&model.length>=7?model.slice(0,-1):null), mk||null, mk==='LG'?'엘지':null, ...lead.filter(w=>w!=='모니터').map(w=>/^(게이밍|화이트|사무용)$/.test(w)?w+'모니터':w), FO==='커브드'?'커브드':null, S?S+'인치':null, PA, RE, (refresh||hzBare||F.hz)?((refresh||hzBare||F.hz)+'Hz'):null, feats.includes('화이트')?'화이트모니터':null]);
   const parts=[model, S?S+'인치':'[크기?]']; if(FO) parts.push(FO); parts.push(PA||'[패널?]', RE||'[해상도?]');
   const rf=RF; if(rf) parts.push(rf+'Hz'); feats.forEach(f=>parts.push(f));
   return {checks,std:parts.join(' '),kw:kwList,category:'monitor'};
@@ -1610,7 +1610,7 @@ const SODIMM_PIN={};
    - 상태 5종: extracted(입력에서 추출) · ocr_suggested(OCR 교정 제안) · external_candidate(외부 자료 후보) · verified(출처 대조 완료) · conflict(충돌·확인불가)
    - 형식 검사(자료형·단위·필수 항목·값 사이 일관성)는 공식 사양과의 대조가 아님. verified 는 사람이 출처 페이지와 값을 대조해 승인한 것만
    ========================================================= */
-const BUILD={ver:'v2.1',id:'20261107-0120'};
+const BUILD={ver:'v2.1',id:'20261109-1324'};
 const SPEC_STATUS={
   extracted:{label:'입력에서 추출',tone:'ask'},
   ocr_suggested:{label:'OCR 교정 제안',tone:'ask'},

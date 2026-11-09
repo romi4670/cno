@@ -1,6 +1,6 @@
 {
  "schema": "cno-specs/1",
- "version": "2026-11-06.1",
+ "version": "2026-11-06.2",
  "updated": "2026-11-06",
  "note": "사양 데이터 파일. 출력 규칙(상품명·브랜드·키워드·중요요약 생성)은 index.html에 있음. status 5종: extracted(입력에서 추출)·ocr_suggested(OCR 교정 제안)·external_candidate(외부 자료 후보)·verified(출처 대조 완료)·conflict(충돌·확인불가)",
  "sources": {
@@ -39,6 +39,12 @@
    "publisher": "Intel",
    "url": "https://www.intel.com/content/www/us/en/products/sku/237556/intel-xeon-silver-4516y-processor-45m-cache-2-20-ghz/specifications.html",
    "title": "Intel® Xeon® 4516Y+ Specifications"
+  },
+  "intel-sku-237504": {
+   "type": "official-page",
+   "publisher": "Intel",
+   "url": "https://www.intel.com/content/www/us/en/products/sku/237504/specifications.html",
+   "title": "Intel® Core™ i9 processor 14900KS (36M Cache, up to 6.20 GHz)"
   }
  },
  "generations": {
@@ -2076,6 +2082,37 @@
     "checkedAt": "2026-11-06",
     "method": "Intel 공식 사양 페이지 본문에서 모델명·항목값 대조",
     "note": ""
+   },
+   "history": []
+  },
+  "14900KS": {
+   "model": "14900KS",
+   "gen": 14,
+   "tier": "i9",
+   "p": 8,
+   "e": 16,
+   "t": 32,
+   "pb": 3.2,
+   "pt": 5.7,
+   "eb": 2.4,
+   "et": 4.5,
+   "max": 6.2,
+   "l2": 32,
+   "l3": 36,
+   "bp": 150,
+   "mtp": 253,
+   "mem": "DDR5-5600/DDR4-3200",
+   "gpu": "UHD 770",
+   "gf": 1.65,
+   "k": true,
+   "ht": true,
+   "disp": "14900KS",
+   "rec": {
+    "status": "verified",
+    "source": "intel-sku-237504",
+    "checkedAt": "2026-11-06",
+    "method": "Intel 공식 사양 페이지 본문 조회 후 모델명·항목값 대조",
+    "note": "페이지 표기 최대 터보 6.2GHz(Thermal Velocity Boost 6.2GHz), P코어 5.7/E코어 4.5GHz, 기본 전력 150W"
    },
    "history": []
   }
